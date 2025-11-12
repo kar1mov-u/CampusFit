@@ -1,12 +1,15 @@
 package repository
 
 import (
+	"context"
 	"t/internal/models"
+
+	"github.com/google/uuid"
 )
 
 type UserRepostiory interface {
-	GetUser(id string) (models.User, error)
-	CreateUser(models.User) (string, error)
-	DeleteUser(id string) bool
-	UpdateUser(models.User) (models.User, error)
+	GetByID(context.Context, uuid.UUID) (models.User, error)
+	CreateUser(context.Context, models.User) (uuid.UUID, error)
+	DeleteUser(context.Context, uuid.UUID) bool
+	UpdateUser(context.Context, models.User) (models.User, error)
 }

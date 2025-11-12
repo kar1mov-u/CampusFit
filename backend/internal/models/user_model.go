@@ -1,13 +1,22 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type User struct {
-	ID          uuid.UUID
-	Email       string
-	FristName   string
-	LastName    string
-	Password    string
-	Role        string // gonna have 3 types of roles 1)Student, Staff, Admin
-	CreditScore int
+	ID           uuid.UUID
+	Email        string
+	FirstName    string
+	LastName     string
+	Password     string
+	Role         string
+	UniversityID string
+	Phone        string
+	CreditScore  int
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
