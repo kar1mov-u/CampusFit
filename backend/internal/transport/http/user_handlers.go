@@ -2,12 +2,11 @@ package http
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"t/internal/transport/dto"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func (s *Server) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,43 +35,36 @@ func (s *Server) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	userModel := createDto.ToModel()
 
 	id, err := s.userService.CraeteUser(r.Context(), userModel)
-	log.Println(err)
 	if err != nil {
 		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to create user")
 		return
 	}
+
 	respondWithJSON(w, http.StatusOK, map[string]uuid.UUID{"user_id": id}, "user created successfully")
 }
 
-type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-	Data    any    `json:"data,omitempty"`
-}
-
-func respondWithJSON(w http.ResponseWriter, status int, body any, message string) {
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(status)
-
-	resp := Response{
-		Success: status < 400,
-		Message: message,
-		Data:    body,
-	}
-
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, `{"success":false,"message":"failed to encode response"}`, http.StatusInternalServerError)
+func (s *Server) GetUserHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		http.Error(w, "missing user id", http.StatusBadRequest)
 		return
 	}
-}
 
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(bytes), err
-}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
 
-// CheckPasswordHash compares a plaintext password with a bcrypt hash.
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
+	user, err := s.userService.GetByID(r.Context(), id)
+	if err != nil {
+		respondWithJSON(w, http.StatusNotFound, nil, "user not found")
+		return
+	}
+
+	//convert to the DTO
+	var userResponse dto.UserResponseDTO
+	userResponse.FromModel(user)
+
+	respondWithJSON(w, http.StatusOK, userResponse, "user found")
 }

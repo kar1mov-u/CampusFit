@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS users (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     password TEXT NOT NULL,
-    university_id TEXT UNIQUE NOT NULL,           -- optional
     phone TEXT,                          -- optional
     credit_score INT DEFAULT 50,
     role role NOT NULL DEFAULT 'student',

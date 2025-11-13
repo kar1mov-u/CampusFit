@@ -23,7 +23,7 @@ func (u *UserRepositoryPostgres) GetByID(ctx context.Context, id uuid.UUID) (mod
 	query := `
 		SELECT 
 			user_id, email, first_name, last_name, password,
-			university_id, phone, credit_score, role, is_active, created_at, updated_at
+			 phone, credit_score, role, is_active, created_at, updated_at
 		FROM users 
 		WHERE user_id = $1
 	`
@@ -34,7 +34,6 @@ func (u *UserRepositoryPostgres) GetByID(ctx context.Context, id uuid.UUID) (mod
 		&user.FirstName,
 		&user.LastName,
 		&user.Password,
-		&user.UniversityID,
 		&user.Phone,
 		&user.CreditScore,
 		&user.Role,
@@ -57,9 +56,9 @@ func (u *UserRepositoryPostgres) CreateUser(ctx context.Context, user models.Use
 	query := `
 		INSERT INTO users (
 			email, first_name, last_name, password,
-			university_id, phone, credit_score, role, is_active
+			 phone, credit_score, role, is_active
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING user_id
 	`
 
@@ -70,7 +69,6 @@ func (u *UserRepositoryPostgres) CreateUser(ctx context.Context, user models.Use
 		user.FirstName,
 		user.LastName,
 		user.Password,
-		user.UniversityID,
 		user.Phone,
 		user.CreditScore,
 		user.Role,

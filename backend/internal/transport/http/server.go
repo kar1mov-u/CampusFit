@@ -40,6 +40,7 @@ func NewServer(addr string, userSrv *service.UserService) *Server {
 func (s *Server) registerHandlers() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/users", s.CreateUserHandler)
+		r.Get("/users/{id}", s.GetUserHandler)
 	})
 }
 
