@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log"
 	"t/internal/config"
-	repo "t/internal/repository/postgres"
-	"t/internal/service"
 	"t/internal/transport/http"
+	"t/internal/user"
 	pg "t/pkg/postgres"
 )
 
@@ -21,8 +20,8 @@ func main() {
 	dbConnString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	pGpool := pg.New(ctx, dbConnString)
 	log.Printf("connected to database")
-	userRepo := repo.NewUserRepositotyPostgres(pGpool)
-	userSrvs := service.NewUserService(userRepo)
+	userRepo := user.NewUserRepositotyPostgres(pGpool)
+	userSrvs := user.NewUserService(userRepo)
 
 	srv := http.NewServer(":8181", userSrvs)
 

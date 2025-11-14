@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"t/internal/models"
+	"t/internal/user"
 	"time"
 )
 
@@ -14,8 +14,8 @@ type CreateUserDTO struct {
 	Role      string `json:"role" validate:"required,oneof=student staff admin"`
 }
 
-func (d *CreateUserDTO) ToModel() models.User {
-	return models.User{
+func (d *CreateUserDTO) ToModel() user.User {
+	return user.User{
 		Email:       d.Email,
 		FirstName:   d.FirstName,
 		LastName:    d.LastName,
@@ -48,7 +48,7 @@ type UserResponseDTO struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-func (d *UserResponseDTO) FromModel(u models.User) {
+func (d *UserResponseDTO) FromModel(u user.User) {
 	d.ID = u.ID.String()
 	d.Email = u.Email
 	d.FirstName = u.FirstName
