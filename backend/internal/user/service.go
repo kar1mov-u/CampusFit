@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
@@ -35,23 +34,3 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 // mb create the jwt here
-func (s *UserService) LoginUser(ctx context.Context, email, password string) (bool, User, error) {
-
-	//get the user from the repo
-	user, err := s.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		return false, User{}, err
-	}
-
-	//check for the password
-	if CheckPasswordHash(password, user.Password) {
-		return true, user, nil
-	}
-	return false, User{}, nil
-}
-
-// CheckPasswordHash compares a plaintext password with a bcrypt hash.
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}

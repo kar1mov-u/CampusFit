@@ -10,7 +10,7 @@ import (
 
 type UserRepostiory interface {
 	GetByID(context.Context, uuid.UUID) (User, error)
-	GetByEmail(context.Context, string) (User, error)
+	GetByEmail(context.Context, string) (uuid.UUID, string, error)
 	CreateUser(context.Context, User) (uuid.UUID, error)
 	DeleteUser(context.Context, uuid.UUID) bool
 	UpdateUser(context.Context, User) (User, error)
@@ -91,36 +91,23 @@ func (u *UserRepositoryPostgres) CreateUser(ctx context.Context, user User) (uui
 	return newID, nil
 }
 
-func (u *UserRepositoryPostgres) GetByEmail(ctx context.Context, email string) (User, error) {
-	var user User
+func (u *UserRepositoryPostgres) GetByEmail(ctx context.Context, email string) (uuid.UUID, string, error) {
+	var id uuid.UUID
+	var hash string
 
 	query := `
 		SELECT 
-			user_id, email, first_name, last_name, password,
-			 phone, credit_score, role, is_active, created_at, updated_at
+			user_id, password
 		FROM users 
 		WHERE email = $1
 	`
-
-	err := u.pool.QueryRow(ctx, query, email).Scan(
-		&user.ID,
-		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.Password,
-		&user.Phone,
-		&user.CreditScore,
-		&user.Role,
-		&user.IsActive,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := u.pool.QueryRow(ctx, query, email).Scan(&id, &hash)
 
 	if err != nil {
-		return User{}, fmt.Errorf("userRepositoy.GetByEmail :%w", err)
+		return uuid.UUID{}, "", fmt.Errorf("userRepositoy.GetByEmail :%w", err)
 	}
 
-	return user, nil
+	return id, hash, nil
 
 }
 

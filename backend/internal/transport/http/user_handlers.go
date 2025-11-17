@@ -43,6 +43,26 @@ func (s *Server) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, map[string]uuid.UUID{"user_id": id}, "user created successfully")
 }
 
+func (s *Server) WhoAmI(w http.ResponseWriter, r *http.Request) {
+	//get the user id from the context
+	id, err := GetID(r.Context())
+	if err != nil {
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid userID")
+		return
+	}
+
+	user, err := s.userService.GetByID(r.Context(), id)
+	if err != nil {
+		respondWithJSON(w, http.StatusNotFound, nil, "user not found")
+		return
+	}
+	var userDto dto.UserResponseDTO
+
+	userDto.FromModel(user)
+
+	respondWithJSON(w, http.StatusOK, userDto, "user found")
+}
+
 func (s *Server) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	if idStr == "" {
