@@ -32,5 +32,3 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
 	}
 	return user, nil
 }
-
-// mb create the jwt here
