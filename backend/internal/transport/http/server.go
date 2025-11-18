@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"t/internal/auth"
+	"t/internal/facility"
 	"t/internal/user"
 
 	"github.com/go-chi/chi/v5"
@@ -12,14 +13,15 @@ import (
 )
 
 type Server struct {
-	router      *chi.Mux
-	httpServer  *http.Server
-	userService *user.UserService
-	authService *auth.AuthService
-	validator   *validator.Validate
+	router          *chi.Mux
+	httpServer      *http.Server
+	userService     *user.UserService
+	authService     *auth.AuthService
+	facilityService *facility.FacilityService
+	validator       *validator.Validate
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -29,10 +31,11 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 			Addr:    addr,
 			Handler: router, // here httpServer uses router to route the incoming request
 		},
-		validator:   validator,
-		userService: userSrv,
-		authService: authSrv,
-		router:      router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
+		facilityService: facilSrv,
+		validator:       validator,
+		userService:     userSrv,
+		authService:     authSrv,
+		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
 
 	s.registerHandlers()
@@ -55,6 +58,7 @@ func (s *Server) registerHandlers() {
 		r.Group(func(pro chi.Router) {
 			pro.Use(s.authService.JWTMiddleware)
 			pro.Get("/users", s.WhoAmI)
+			pro.Post("/facility", s.CreateFacilityHandler)
 		})
 
 	})

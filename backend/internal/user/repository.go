@@ -14,6 +14,7 @@ type UserRepostiory interface {
 	CreateUser(context.Context, User) (uuid.UUID, error)
 	DeleteUser(context.Context, uuid.UUID) bool
 	UpdateUser(context.Context, User) (User, error)
+	GetRole(context.Context, uuid.UUID) (string, error)
 }
 
 //----------------------- this is the implementation of the userRepo, for now i just have 1 , so can keep in the same file, later might change
@@ -116,4 +117,16 @@ func (u *UserRepositoryPostgres) DeleteUser(ctx context.Context, id uuid.UUID) b
 }
 func (u *UserRepositoryPostgres) UpdateUser(ctx context.Context, user User) (User, error) {
 	return User{}, nil
+}
+
+func (u *UserRepositoryPostgres) GetRole(ctx context.Context, id uuid.UUID) (string, error) {
+	var role string
+
+	query := `SELECT role FROM users WHERE user_id=$1`
+
+	err := u.pool.QueryRow(ctx, query, id).Scan(&role)
+	if err != nil {
+		return "", err
+	}
+	return role, nil
 }

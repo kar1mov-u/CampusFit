@@ -6,6 +6,7 @@ import (
 	"log"
 	"t/internal/auth"
 	"t/internal/config"
+	"t/internal/facility"
 	"t/internal/transport/http"
 	"t/internal/user"
 	pg "t/pkg/postgres"
@@ -30,7 +31,11 @@ func main() {
 	//to-do  (change to read key from the .env)
 	authSrv := auth.NewAuthSerivce(cfg.JWTKey, userRepo)
 
-	srv := http.NewServer(":8181", userSrvs, authSrv)
+	//create facility
+	facilRep := facility.NewFacilityRepositoryPostgres(pGpool)
+	facilSrv := facility.NewFacilityService(facilRep)
+
+	srv := http.NewServer(":8181", userSrvs, authSrv, facilSrv)
 
 	srv.Start()
 

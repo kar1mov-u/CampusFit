@@ -11,7 +11,7 @@ type CreateUserDTO struct {
 	LastName  string `json:"last_name" validate:"required,min=2,max=50"`
 	Password  string `json:"password" validate:"required,min=6,max=100"`
 	Phone     string `json:"phone"` // if using phone validation
-	Role      string `json:"role" validate:"required,oneof=student staff admin"`
+	Role      string `json:"role" validate:"required,oneof=student staff"`
 }
 
 func (d *CreateUserDTO) ToModel() user.User {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"t/internal/user"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,6 +14,11 @@ type AuthService struct {
 	jwtKey   string
 	userRepo user.UserRepostiory
 }
+
+const (
+	ADMIN = "admin"
+	STAFF = "staff"
+)
 
 func NewAuthSerivce(key string, userRep user.UserRepostiory) *AuthService {
 	return &AuthService{
@@ -44,6 +50,15 @@ func (s *AuthService) LoginUser(ctx context.Context, email, password string) (st
 	}
 
 	return jwt, nil
+}
+
+func (s *AuthService) IsAdmin(ctx context.Context, id uuid.UUID) bool {
+	role, err := s.userRepo.GetRole(ctx, id)
+	log.Printf(role, err)
+	if err != nil || role != ADMIN {
+		return false
+	}
+	return true
 }
 
 // CheckPasswordHash compares a plaintext password with a bcrypt hash.
