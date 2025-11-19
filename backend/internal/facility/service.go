@@ -32,6 +32,7 @@ func (s *FacilityService) ListFacilities(ctx context.Context) ([]Facility, error
 func (s *FacilityService) UpdateFacility(ctx context.Context, f Facility) error {
 	_, err := s.facilityRepo.GetFacility(ctx, f.ID)
 	if err != nil {
+
 		return err // facility does not exist
 	}
 	return s.facilityRepo.UpdateFacility(ctx, f)

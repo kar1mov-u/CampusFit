@@ -57,8 +57,15 @@ func (s *Server) registerHandlers() {
 		//	protected routes
 		r.Group(func(pro chi.Router) {
 			pro.Use(s.authService.JWTMiddleware)
-			pro.Get("/users", s.WhoAmI)
+
+			pro.Get("/users/{id}", s.GetUserHandler)
+			pro.Get("/users/me", s.WhoAmI)
+
+			pro.Get("/facility/{id}", s.GetFacilityHandler)
+			pro.Patch("/facility/{id}", s.UpdateFacilityHandler)
+			pro.Get("/facility/all", s.ListFacilitiesHandler)
 			pro.Post("/facility", s.CreateFacilityHandler)
+			pro.Delete("/facility/{id}", s.DeleteFacilityHandler)
 		})
 
 	})

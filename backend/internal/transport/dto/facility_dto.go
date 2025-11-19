@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"fmt"
 	"t/internal/facility"
 	"time"
 
@@ -12,20 +13,9 @@ type CreateFacilityDTO struct {
 	Type        string `json:"type" validate:"required"`
 	Description string `json:"description" validate:"required,min=5"`
 	Capacity    int    `json:"capacity" validate:"required,min=1"`
-	OpenTime    string `json:"open_time" validate:"required,datetime=2006-01-02T15:04"`
-	CloseTime   string `json:"close_time" validate:"required,datetime=2006-01-02T15:04"`
+	OpenTime    string `json:"open_time" validate:"required,datetime=15:04"`
+	CloseTime   string `json:"close_time" validate:"required,datetime=15:04"`
 	ImageURL    string `json:"image_url" validate:"url"`
-}
-
-type UpdateFacilityDTO struct {
-	Name        *string `json:"name,omitempty"`
-	Type        *string `json:"type,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Capacity    *int    `json:"capacity,omitempty"`
-	OpenTime    *string `json:"open_time,omitempty"`
-	CloseTime   *string `json:"close_time,omitempty"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	IsActive    *bool   `json:"is_active,omitempty"`
 }
 
 type FacilityResponseDTO struct {
@@ -34,8 +24,8 @@ type FacilityResponseDTO struct {
 	Type        string    `json:"type"`
 	Description string    `json:"description"`
 	Capacity    int       `json:"capacity"`
-	OpenTime    time.Time `json:"open_time"`
-	CloseTime   time.Time `json:"close_time"`
+	OpenTime    string    `json:"open_time"`
+	CloseTime   string    `json:"close_time"`
 	ImageURL    string    `json:"image_url"`
 	IsActive    bool      `json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -43,14 +33,14 @@ type FacilityResponseDTO struct {
 }
 
 func (d *CreateFacilityDTO) ToModel() (facility.Facility, error) {
-	openTime, err := time.Parse("2006-01-02T15:04", d.OpenTime)
+	openTime, err := time.Parse("15:04", d.OpenTime)
 	if err != nil {
-		return facility.Facility{}, err
+		return facility.Facility{}, fmt.Errorf("invalid open_time format, expected HH:MM")
 	}
 
-	closeTime, err := time.Parse("2006-01-02T15:04", d.CloseTime)
+	closeTime, err := time.Parse("15:04", d.CloseTime)
 	if err != nil {
-		return facility.Facility{}, err
+		return facility.Facility{}, fmt.Errorf("invalid close_time format, expected HH:MM")
 	}
 
 	now := time.Now()
@@ -70,20 +60,29 @@ func (d *CreateFacilityDTO) ToModel() (facility.Facility, error) {
 	}, nil
 }
 
-func (d *FacilityResponseDTO) ToDTO(f facility.Facility) FacilityResponseDTO {
-	return FacilityResponseDTO{
-		ID:          f.ID.String(),
-		Name:        f.Name,
-		Type:        f.Type,
-		Description: f.Description,
-		Capacity:    f.Capacity,
-		OpenTime:    f.OpenTime,
-		CloseTime:   f.CloseTime,
-		ImageURL:    f.ImageURL,
-		IsActive:    f.IsActive,
-		CreatedAt:   f.CreatedAt,
-		UpdatedAt:   f.UpdatedAt,
-	}
+func (d *FacilityResponseDTO) ToDTO(f facility.Facility) {
+	d.ID = f.ID.String()
+	d.Name = f.Name
+	d.Type = f.Type
+	d.Description = f.Description
+	d.Capacity = f.Capacity
+	d.OpenTime = f.OpenTime.Format("15:04")
+	d.CloseTime = f.CloseTime.Format("15:04")
+	d.ImageURL = f.ImageURL
+	d.IsActive = f.IsActive
+	d.CreatedAt = f.CreatedAt
+	d.UpdatedAt = f.UpdatedAt
+}
+
+type UpdateFacilityDTO struct {
+	Name        *string `json:"name,omitempty"`
+	Type        *string `json:"type,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Capacity    *int    `json:"capacity,omitempty"`
+	OpenTime    *string `json:"open_time,omitempty"`
+	CloseTime   *string `json:"close_time,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+	IsActive    *bool   `json:"is_active,omitempty"`
 }
 
 func (d *UpdateFacilityDTO) ApplyToFacility(f *facility.Facility) error {
@@ -100,14 +99,14 @@ func (d *UpdateFacilityDTO) ApplyToFacility(f *facility.Facility) error {
 		f.Capacity = *d.Capacity
 	}
 	if d.OpenTime != nil {
-		t, err := time.Parse("2006-01-02T15:04", *d.OpenTime)
+		t, err := time.Parse("15:04", *d.OpenTime)
 		if err != nil {
 			return err
 		}
 		f.OpenTime = t
 	}
 	if d.CloseTime != nil {
-		t, err := time.Parse("2006-01-02T15:04", *d.CloseTime)
+		t, err := time.Parse("15:04", *d.CloseTime)
 		if err != nil {
 			return err
 		}
