@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 )
 
 type Server struct {
@@ -19,6 +21,7 @@ type Server struct {
 	authService     *auth.AuthService
 	facilityService *facility.FacilityService
 	validator       *validator.Validate
+	logger          *zap.Logger
 }
 
 func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService) *Server {
@@ -26,11 +29,15 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
 
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:    addr,
 			Handler: router, // here httpServer uses router to route the incoming request
 		},
+		logger:          logger,
 		facilityService: facilSrv,
 		validator:       validator,
 		userService:     userSrv,
@@ -45,6 +52,14 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 }
 
 func (s *Server) registerHandlers() {
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000", "https://your-frontend.com"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // maximum age for preflight request cache
+	}))
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Use(middleware.Logger)
 

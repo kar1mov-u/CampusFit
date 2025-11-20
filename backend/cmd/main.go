@@ -35,7 +35,7 @@ func main() {
 	facilRep := facility.NewFacilityRepositoryPostgres(pGpool)
 	facilSrv := facility.NewFacilityService(facilRep)
 
-	srv := http.NewServer(":8181", userSrvs, authSrv, facilSrv)
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv)
 
 	srv.Start()
 
