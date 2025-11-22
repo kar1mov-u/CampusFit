@@ -59,16 +59,16 @@ export interface CreateFacilityRequest {
 }
 
 export interface Booking {
-  booking_id: string;
+  id: string;
   user_id: string;
   facility_id: string;
-  start_time: string;
-  end_time: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  date: string;
+  start_time: string;  // "10:00"
+  end_time: string;    // "11:00"
+  note: string;
+  is_canceled: boolean;
+  admin_note: string;
   created_at: string;
-  updated_at: string;
-  user?: User;
-  facility?: Facility;
 }
 
 export interface CreateBookingRequest {

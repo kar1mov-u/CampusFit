@@ -33,17 +33,15 @@ const BookingsManagement: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const getStatusColor = (isCanceled: boolean) => {
+    if (isCanceled) {
+      return 'bg-red-100 text-red-800';
     }
+    return 'bg-green-100 text-green-800';
+  };
+
+  const getStatusText = (isCanceled: boolean) => {
+    return isCanceled ? 'Cancelled' : 'Confirmed';
   };
 
   if (loading) {
@@ -71,10 +69,13 @@ const BookingsManagement: React.FC = () => {
                 Facility
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Start Time
+                Date
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                End Time
+                Time
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Note
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -86,45 +87,50 @@ const BookingsManagement: React.FC = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {bookings.map((booking) => (
-              <tr key={booking.booking_id}>
+              <tr key={booking.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-mono text-gray-900">
-                    {booking.booking_id.substring(0, 8)}...
+                    {booking.id.substring(0, 8)}...
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {booking.user ? `${booking.user.first_name} ${booking.user.last_name}` : booking.user_id}
+                    {booking.user_id.substring(0, 8)}...
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {booking.facility?.name || booking.facility_id}
+                    {booking.facility_id.substring(0, 8)}...
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {format(new Date(booking.start_time), 'MMM d, yyyy HH:mm')}
+                    {booking.date}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {format(new Date(booking.end_time), 'MMM d, yyyy HH:mm')}
+                    {booking.start_time} - {booking.end_time}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-900 max-w-xs truncate">
+                    {booking.note || '-'}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                      booking.status
+                      booking.is_canceled
                     )}`}
                   >
-                    {booking.status}
+                    {getStatusText(booking.is_canceled)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {booking.status !== 'cancelled' && (
+                  {!booking.is_canceled && (
                     <button
-                      onClick={() => handleCancel(booking.booking_id)}
+                      onClick={() => handleCancel(booking.id)}
                       className="text-red-600 hover:text-red-900"
                     >
                       Cancel

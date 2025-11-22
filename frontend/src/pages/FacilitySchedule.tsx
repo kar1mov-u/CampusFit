@@ -4,16 +4,19 @@ import { facilityService } from '../api/facility';
 import { bookingService } from '../api/booking';
 import { Facility, Booking } from '../types';
 import { format, addDays } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 const FacilitySchedule: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [facility, setFacility] = useState<Facility | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<number[]>([]);
+  const [bookingNote, setBookingNote] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -58,45 +61,72 @@ const FacilitySchedule: React.FC = () => {
     return slots;
   };
 
-  const isSlotBooked = (hour: number) => {
-    return bookings.some((booking) => {
-      const bookingStart = new Date(booking.start_time);
-      const bookingHour = bookingStart.getHours();
-      return bookingHour === hour && booking.status !== 'cancelled';
+  const getSlotStatus = (hour: number): 'available' | 'booked' | 'my-booking' => {
+    const booking = bookings.find((b) => {
+      const startHour = parseInt(b.start_time.split(':')[0]);
+      const endHour = parseInt(b.end_time.split(':')[0]);
+      return hour >= startHour && hour < endHour && !b.is_canceled;
     });
+
+    if (!booking) return 'available';
+    if (booking.user_id === user?.id) return 'my-booking';
+    return 'booked';
   };
 
-  const handleSlotClick = (hour: number) => {
-    const startTime = new Date(selectedDate);
-    startTime.setHours(hour, 0, 0, 0);
-    const endTime = new Date(startTime);
-    endTime.setHours(hour + 1);
+  const isSlotSelected = (hour: number) => selectedSlots.includes(hour);
 
-    if (!isSlotBooked(hour)) {
-      setSelectedSlot({
-        start: startTime.toISOString(),
-        end: endTime.toISOString(),
-      });
+  const handleSlotClick = (hour: number) => {
+    const status = getSlotStatus(hour);
+    if (status !== 'available') return;
+
+    if (isSlotSelected(hour)) {
+      // Deselect
+      setSelectedSlots(selectedSlots.filter(h => h !== hour));
+    } else {
+      // Only allow consecutive slots (max 2)
+      if (selectedSlots.length === 0) {
+        setSelectedSlots([hour]);
+      } else if (selectedSlots.length === 1) {
+        const existing = selectedSlots[0];
+        if (Math.abs(hour - existing) === 1) {
+          // Consecutive slot
+          setSelectedSlots([Math.min(hour, existing), Math.max(hour, existing)]);
+        } else {
+          // Non-consecutive, replace
+          setSelectedSlots([hour]);
+        }
+      } else {
+        // Already have 2 slots, replace with new selection
+        setSelectedSlots([hour]);
+      }
+    }
+  };
+
+  const openBookingModal = () => {
+    if (selectedSlots.length > 0) {
       setShowBookingModal(true);
     }
   };
 
   const handleBooking = async () => {
-    if (!selectedSlot || !id) return;
+    if (selectedSlots.length === 0 || !id) return;
 
     try {
-      // Parse the ISO timestamps to extract date and time
-      const startDate = new Date(selectedSlot.start);
-      const endDate = new Date(selectedSlot.end);
+      const sortedSlots = [...selectedSlots].sort((a, b) => a - b);
+      const startHour = sortedSlots[0];
+      const endHour = sortedSlots[sortedSlots.length - 1] + 1;
 
       await bookingService.create({
         facility_id: id,
-        date: format(startDate, 'yyyy-MM-dd'),
-        start_time: format(startDate, 'HH:mm'),
-        end_time: format(endDate, 'HH:mm'),
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        start_time: `${startHour.toString().padStart(2, '0')}:00`,
+        end_time: `${endHour.toString().padStart(2, '0')}:00`,
+        note: bookingNote,
       });
+      
       setShowBookingModal(false);
-      setSelectedSlot(null);
+      setSelectedSlots([]);
+      setBookingNote('');
       loadData();
       alert('Booking created successfully!');
     } catch (err: any) {
@@ -235,6 +265,9 @@ const FacilitySchedule: React.FC = () => {
             <p className="text-gray-600 mt-1">
               {format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Click on available slots to select. You can select 1 or 2 consecutive hours.
+            </p>
           </div>
           
           {timeSlots.length === 0 ? (
@@ -245,53 +278,109 @@ const FacilitySchedule: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {timeSlots.map((slot) => {
-                const booked = isSlotBooked(slot.hour);
+                const status = getSlotStatus(slot.hour);
+                const selected = isSlotSelected(slot.hour);
+                
+                let colorClasses = '';
+                let cursorClass = 'cursor-pointer';
+                let statusIcon = '';
+                
+                if (selected) {
+                  colorClasses = 'bg-yellow-100 border-yellow-400 text-yellow-900 ring-2 ring-yellow-400';
+                  statusIcon = '📌 Selected';
+                } else if (status === 'my-booking') {
+                  colorClasses = 'bg-blue-50 text-blue-700 border-2 border-blue-300';
+                  cursorClass = 'cursor-default';
+                  statusIcon = '✓ Your Booking';
+                } else if (status === 'booked') {
+                  colorClasses = 'bg-red-50 text-red-700 border-2 border-red-200 opacity-60';
+                  cursorClass = 'cursor-not-allowed';
+                  statusIcon = '🔒 Booked';
+                } else {
+                  colorClasses = 'bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 hover:border-green-300 shadow-sm hover:shadow-md';
+                  statusIcon = '✓ Available';
+                }
+
                 return (
                   <button
                     key={slot.time}
                     onClick={() => handleSlotClick(slot.hour)}
-                    disabled={booked}
-                    className={`p-5 rounded-xl text-center font-semibold transition-all transform hover:scale-105 ${
-                      booked
-                        ? 'bg-red-50 text-red-700 border-2 border-red-200 cursor-not-allowed opacity-60'
-                        : 'bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 hover:border-green-300 shadow-sm hover:shadow-md'
-                    }`}
+                    disabled={status !== 'available'}
+                    className={`p-5 rounded-xl text-center font-semibold transition-all transform hover:scale-105 ${colorClasses} ${cursorClass}`}
                   >
                     <div className="text-xl font-bold">{slot.time}</div>
                     <div className="text-xs mt-2 font-medium uppercase tracking-wide">
-                      {booked ? '🔒 Booked' : '✓ Available'}
+                      {statusIcon}
                     </div>
                   </button>
                 );
               })}
             </div>
           )}
+
+          {selectedSlots.length > 0 && (
+            <div className="mt-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    Selected: {selectedSlots.sort((a, b) => a - b).map(h => `${h}:00`).join(' - ')} 
+                    {selectedSlots.length > 1 ? ` - ${Math.max(...selectedSlots) + 1}:00` : ` - ${selectedSlots[0] + 1}:00`}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Duration: {selectedSlots.length} hour{selectedSlots.length > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedSlots([])}
+                    className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={openBookingModal}
+                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold shadow-md hover:shadow-lg"
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Legend */}
-        <div className="mt-6 flex items-center justify-center gap-8 text-sm bg-white rounded-lg py-4 px-6 shadow-sm">
+        <div className="mt-6 flex items-center justify-center gap-8 text-sm bg-white rounded-lg py-4 px-6 shadow-sm flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-green-50 border-2 border-green-200 rounded"></div>
-            <span className="font-medium text-gray-700">Available to book</span>
+            <span className="font-medium text-gray-700">Available</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-blue-50 border-2 border-blue-300 rounded"></div>
+            <span className="font-medium text-gray-700">Your Booking</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-red-50 border-2 border-red-200 rounded"></div>
-            <span className="font-medium text-gray-700">Already booked</span>
+            <span className="font-medium text-gray-700">Booked by Others</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-400 rounded"></div>
+            <span className="font-medium text-gray-700">Selected</span>
           </div>
         </div>
       </div>
 
       {/* Booking Modal */}
-      {showBookingModal && selectedSlot && (
+      {showBookingModal && selectedSlots.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
             <h3 className="text-2xl font-bold mb-6 text-gray-900">Confirm Your Booking</h3>
-            <div className="space-y-4 mb-8 bg-gray-50 p-5 rounded-xl">
+            <div className="space-y-4 mb-6 bg-gray-50 p-5 rounded-xl">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🏢</span>
                 <div>
                   <p className="text-xs text-gray-500">Facility</p>
-                  <p className="font-semibold text-gray-900">{facility.name}</p>
+                  <p className="font-semibold text-gray-900">{facility?.name}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -306,22 +395,39 @@ const FacilitySchedule: React.FC = () => {
                 <div>
                   <p className="text-xs text-gray-500">Time</p>
                   <p className="font-semibold text-gray-900">
-                    {new Date(selectedSlot.start).toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })} - {new Date(selectedSlot.end).toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {Math.min(...selectedSlots).toString().padStart(2, '0')}:00 - {(Math.max(...selectedSlots) + 1).toString().padStart(2, '0')}:00
                   </p>
                 </div>
               </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⏱️</span>
+                <div>
+                  <p className="text-xs text-gray-500">Duration</p>
+                  <p className="font-semibold text-gray-900">{selectedSlots.length} hour{selectedSlots.length > 1 ? 's' : ''}</p>
+                </div>
+              </div>
             </div>
+            
+            {/* Note Input */}
+            <div className="mb-6">
+              <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
+                Add a note (optional)
+              </label>
+              <textarea
+                id="note"
+                value={bookingNote}
+                onChange={(e) => setBookingNote(e.target.value)}
+                placeholder="E.g., Team practice, Basketball game, etc."
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                rows={3}
+              />
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setShowBookingModal(false);
-                  setSelectedSlot(null);
+                  setBookingNote('');
                 }}
                 className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-gray-700"
               >

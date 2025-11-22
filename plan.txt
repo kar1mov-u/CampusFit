@@ -3,3 +3,6 @@
     2. it shouldnt overlap with other bookings
     3. user can book 1 facility 1 times a day
     4. at a given point user can book only 1 facility
+
+1. Should work on the logic of the admin user 
+can look to the users bookigs, rate the ones that are already finished

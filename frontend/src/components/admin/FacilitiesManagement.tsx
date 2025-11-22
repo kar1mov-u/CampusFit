@@ -37,7 +37,7 @@ const FacilitiesManagement: React.FC = () => {
     e.preventDefault();
     try {
       if (editingFacility) {
-        await facilityService.update(editingFacility.facility_id, formData);
+        await facilityService.update(editingFacility.id, formData);
       } else {
         await facilityService.create(formData);
       }
@@ -134,7 +134,7 @@ const FacilitiesManagement: React.FC = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {facilities.map((facility) => (
-              <tr key={facility.facility_id}>
+              <tr key={facility.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">{facility.name}</div>
                 </td>
@@ -168,7 +168,7 @@ const FacilitiesManagement: React.FC = () => {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(facility.facility_id)}
+                    onClick={() => handleDelete(facility.id)}
                     className="text-red-600 hover:text-red-900"
                   >
                     Delete
