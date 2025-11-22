@@ -34,7 +34,7 @@ export interface CreateUserRequest {
 }
 
 export interface Facility {
-  facility_id: string;
+  id: string;
   name: string;
   type: 'football' | 'basketball' | 'tennis';
   description: string;
@@ -73,8 +73,10 @@ export interface Booking {
 
 export interface CreateBookingRequest {
   facility_id: string;
-  start_time: string;
-  end_time: string;
+  date: string;        // "2025-11-22"
+  start_time: string;  // "10:00"
+  end_time: string;    // "11:00"
+  note?: string;
 }
 
 // Generic API Response wrapper from backend

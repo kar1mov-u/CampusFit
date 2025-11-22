@@ -1,0 +1,5 @@
+1. Rules for the booking
+    1. booking should be in the range of working hours
+    2. it shouldnt overlap with other bookings
+    3. user can book 1 facility 1 times a day
+    4. at a given point user can book only 1 facility

@@ -79,8 +79,8 @@ const Facilities: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {facilities.map((facility) => (
               <div
-                key={facility.facility_id}
-                onClick={() => navigate(`/facility/${facility.facility_id}`)}
+                key={facility.id}
+                onClick={() => navigate(`/facility/${facility.id}`)}
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
               >
                 <div className="h-48 bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
