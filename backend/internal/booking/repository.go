@@ -15,6 +15,8 @@ type BookingRepository interface {
 	UserHasOverlap(ctx context.Context, tx pgx.Tx, userID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error)     //checks user has overalp of bookings with other facilities
 	BookingHasOverlap(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error) //checks if the booking on that facility has not  overalp on that time interval
 	CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error
+	ListBookigsForFacility(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, date time.Time) ([]Booking, error)
+
 	BeginTx(context.Context) (pgx.Tx, error)
 }
 
@@ -41,6 +43,13 @@ func (r *BookingRepositoryPostgres) execRow(ctx context.Context, tx pgx.Tx, q st
 		return tx.QueryRow(ctx, q, args...)
 	}
 	return r.pool.QueryRow(ctx, q, args...)
+}
+
+func (r *BookingRepositoryPostgres) execRows(ctx context.Context, tx pgx.Tx, q string, args ...any) (pgx.Rows, error) {
+	if tx != nil {
+		return tx.Query(ctx, q, args...)
+	}
+	return r.pool.Query(ctx, q, args...)
 }
 
 func (r *BookingRepositoryPostgres) exec(ctx context.Context, tx pgx.Tx, q string, args ...any) error {
@@ -137,4 +146,32 @@ func (r *BookingRepositoryPostgres) CreateBooking(ctx context.Context, tx pgx.Tx
 	}
 
 	return nil
+}
+
+func (r *BookingRepositoryPostgres) ListBookigsForFacility(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, date time.Time) ([]Booking, error) {
+	query := `SELECT booking_id, facility_id, user_id,date, start_time, end_time, note, created_at FROM bookings WHERE facility_id = $1 AND is_canceled = FALSE AND date = $2`
+
+	rows, err := r.execRows(ctx, tx, query, facilID, date)
+	if err != nil {
+		return []Booking{}, fmt.Errorf("repository.ListBookigsFacility querying rows: %w", err)
+	}
+
+	defer rows.Close()
+
+	resp := make([]Booking, 0)
+
+	for rows.Next() {
+		var i Booking
+		err = rows.Scan(&i.ID, &i.FacilityID, &i.UserID, &i.Date, &i.StartTime, &i.EndTime, &i.Note, &i.CreatedAt)
+		if err != nil {
+			return []Booking{}, fmt.Errorf("repository.ListBookigsFacility scanning rows: %w", err)
+		}
+
+		resp = append(resp, i)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("repository.ListBookingsForFacility rows: %w", rows.Err())
+	}
+	return resp, nil
 }

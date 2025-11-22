@@ -18,7 +18,6 @@ func (s *Server) CreateFacilityHandler(w http.ResponseWriter, r *http.Request) {
 		respondWithJSON(w, http.StatusBadRequest, nil, "falied to decode")
 		return
 	}
-
 	//validate for the fields
 	if err := s.validator.Struct(createReq); err != nil {
 		respondWithJSON(w, http.StatusBadRequest, nil, "malformed input")
@@ -179,10 +178,10 @@ func (s *Server) DeleteFacilityHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = s.facilityService.DeleteFacility(r.Context(), facilID)
 	if err != nil {
+
 		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to delete")
 		return
 	}
 
 	respondWithJSON(w, http.StatusOK, nil, "")
-
 }

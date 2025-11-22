@@ -3,6 +3,9 @@ package booking
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type BookingService struct {
@@ -56,4 +59,8 @@ func (s *BookingService) CreateNewBooking(ctx context.Context, data Booking) err
 	}
 
 	return nil
+}
+
+func (s *BookingService) ListBookings(ctx context.Context, facilID uuid.UUID, date time.Time) ([]Booking, error) {
+	return s.bookingRepo.ListBookigsForFacility(ctx, nil, facilID, date)
 }

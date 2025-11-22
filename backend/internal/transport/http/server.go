@@ -57,7 +57,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 func (s *Server) registerHandlers() {
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000", "https://your-frontend.com"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
@@ -91,6 +91,7 @@ func (s *Server) registerHandlers() {
 			pro.Delete("/facility/{id}", s.DeleteFacilityHandler)
 
 			pro.Post("/bookings", s.CreateBookingHandler)
+			pro.Get("/bookings/facility/{facility_id}", s.ListBookingsHandler)
 		})
 
 	})
