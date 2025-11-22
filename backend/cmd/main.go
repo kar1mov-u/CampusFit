@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"t/internal/auth"
+	"t/internal/booking"
 	"t/internal/config"
 	"t/internal/facility"
 	"t/internal/transport/http"
@@ -35,7 +36,11 @@ func main() {
 	facilRep := facility.NewFacilityRepositoryPostgres(pGpool)
 	facilSrv := facility.NewFacilityService(facilRep)
 
-	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv)
+	//create bookings
+	bookingRep := booking.NewBookingRepositoryPostgres(pGpool)
+	bookingSrv := booking.NewBookingService(bookingRep)
+
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv)
 
 	srv.Start()
 

@@ -1,8 +1,11 @@
 package dto
 
 import (
+	"fmt"
 	"t/internal/booking"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CreateBookingRequest struct {
@@ -11,6 +14,49 @@ type CreateBookingRequest struct {
 	StartTime  string `json:"start_time" validate:"required"` // "10:00"
 	EndTime    string `json:"end_time" validate:"required"`   // "11:00"
 	Note       string `json:"note"`
+}
+
+func (b *CreateBookingRequest) ToModel(userID uuid.UUID) (booking.Booking, error) {
+	// Parse FacilityID
+	facilID, err := uuid.Parse(b.FacilityID)
+	if err != nil {
+		return booking.Booking{}, fmt.Errorf("invalid facility_id: %w", err)
+	}
+
+	// Parse Date ("2025-02-14")
+	date, err := time.Parse("2006-01-02", b.Date)
+	if err != nil {
+		return booking.Booking{}, fmt.Errorf("invalid date format, expected YYYY-MM-DD: %w", err)
+	}
+
+	// Parse StartTime ("10:00")
+	start, err := time.Parse("15:04", b.StartTime)
+	if err != nil {
+		return booking.Booking{}, fmt.Errorf("invalid start_time format, expected HH:MM: %w", err)
+	}
+
+	// Parse EndTime ("11:00")
+	end, err := time.Parse("15:04", b.EndTime)
+	if err != nil {
+		return booking.Booking{}, fmt.Errorf("invalid end_time format, expected HH:MM: %w", err)
+	}
+
+	// Validate interval
+	if !end.After(start) {
+		return booking.Booking{}, fmt.Errorf("end_time must be after start_time")
+	}
+
+	// Return domain model
+	return booking.Booking{
+		FacilityID: facilID,
+		UserID:     userID,
+		Date:       date,
+		StartTime:  start,
+		EndTime:    end,
+		Note:       b.Note,
+		IsCanceled: false,
+		AdminNote:  "",
+	}, nil
 }
 
 type CancelBookingRequest struct {

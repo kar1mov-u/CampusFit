@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"t/internal/auth"
+	"t/internal/booking"
 	"t/internal/facility"
 	"t/internal/user"
 
@@ -20,11 +21,12 @@ type Server struct {
 	userService     *user.UserService
 	authService     *auth.AuthService
 	facilityService *facility.FacilityService
+	bookingService  *booking.BookingService
 	validator       *validator.Validate
 	logger          *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -41,6 +43,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 		facilityService: facilSrv,
 		validator:       validator,
 		userService:     userSrv,
+		bookingService:  bookSrv,
 		authService:     authSrv,
 		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
@@ -76,11 +79,18 @@ func (s *Server) registerHandlers() {
 			pro.Get("/users/{id}", s.GetUserHandler)
 			pro.Get("/users/me", s.WhoAmI)
 
+			//handler to get just 1 facility
 			pro.Get("/facility/{id}", s.GetFacilityHandler)
+			//handler to update the facility
 			pro.Patch("/facility/{id}", s.UpdateFacilityHandler)
+
 			pro.Get("/facility/all", s.ListFacilitiesHandler)
+			//craete facility
 			pro.Post("/facility", s.CreateFacilityHandler)
+			//delete facility
 			pro.Delete("/facility/{id}", s.DeleteFacilityHandler)
+
+			pro.Post("/bookings", s.CreateBookingHandler)
 		})
 
 	})
