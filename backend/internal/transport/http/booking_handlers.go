@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"t/internal/transport/dto"
 	"time"
 
@@ -59,7 +60,7 @@ func (s *Server) CreateBookingHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (s *Server) ListBookingsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ListFacilityBookingsHandler(w http.ResponseWriter, r *http.Request) {
 	//get the facil id from the path
 	idStr := chi.URLParam(r, "facility_id")
 	if idStr == "" {
@@ -84,7 +85,7 @@ func (s *Server) ListBookingsHandler(w http.ResponseWriter, r *http.Request) {
 		respondWithJSON(w, http.StatusBadRequest, nil, "invalid date format, expected YYYY-MM-DD:")
 	}
 
-	bookings, err := s.bookingService.ListBookings(r.Context(), facilID, date)
+	bookings, err := s.bookingService.ListBookingsForFacility(r.Context(), facilID, date)
 	if err != nil {
 		s.logger.Warn("failed to list bookings", zap.Error(err))
 		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to list bookings")
@@ -97,5 +98,60 @@ func (s *Server) ListBookingsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusOK, resp, "successfully listed")
+
+}
+
+func (s *Server) ListUserBookingsHandler(w http.ResponseWriter, r *http.Request) {
+	//first it should be user itself or the admin to access users bookings
+	pathIDstr := chi.URLParam(r, "id")
+	pathID, err := uuid.Parse(pathIDstr)
+	if err != nil {
+		s.logger.Warn("invalid userID in path parameter", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid userID in path")
+		return
+	}
+
+	userID, err := GetID(r.Context())
+	if err != nil {
+		s.logger.Warn("invalid userID from context", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid userID in context")
+		return
+	}
+
+	// if id's do not mathc then user should be the admin!!!
+	if pathID != userID && !s.authService.IsAdmin(r.Context(), userID) {
+		s.logger.Warn("user is not admin and not requesting its own data")
+		respondWithJSON(w, http.StatusForbidden, nil, "access denied")
+		return
+	}
+
+	//get the offset from the query parameter and convert to int
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		s.logger.Warn("offset is not int value", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "offset should be interger")
+		return
+	}
+
+	resp, err := s.bookingService.ListBookingForUser(r.Context(), userID, offset)
+	if err != nil {
+		s.logger.Warn("failed to list bookingsUser", zap.Error(err))
+		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to list bookigs")
+		return
+	}
+
+	respDto := make([]dto.BookingResponse, 0)
+	for _, b := range resp {
+
+		i := dto.ToBookingResponse(b)
+
+		respDto = append(respDto, i)
+	}
+
+	respondWithJSON(w, http.StatusOK, respDto, "successfuly listed bookings")
 
 }

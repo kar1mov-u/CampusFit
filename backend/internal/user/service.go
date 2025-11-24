@@ -32,3 +32,7 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (User, error) {
 	}
 	return user, nil
 }
+
+func (s *UserService) ListUsers(ctx context.Context, email string, offset int) ([]User, error) {
+	return s.userRepo.ListUsers(ctx, email, offset)
+}

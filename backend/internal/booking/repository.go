@@ -16,7 +16,7 @@ type BookingRepository interface {
 	BookingHasOverlap(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error) //checks if the booking on that facility has not  overalp on that time interval
 	CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error
 	ListBookigsForFacility(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, date time.Time) ([]Booking, error)
-
+	ListBookingsForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID, offset int) ([]Booking, error)
 	BeginTx(context.Context) (pgx.Tx, error)
 }
 
@@ -173,5 +173,46 @@ func (r *BookingRepositoryPostgres) ListBookigsForFacility(ctx context.Context, 
 	if rows.Err() != nil {
 		return nil, fmt.Errorf("repository.ListBookingsForFacility rows: %w", rows.Err())
 	}
+	return resp, nil
+}
+
+func (r *BookingRepositoryPostgres) ListBookingsForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID, offset int) ([]Booking, error) {
+
+	resp := make([]Booking, 0)
+
+	query := `
+        SELECT booking_id, facility_id, user_id, date, start_time, end_time, note, created_at
+        FROM bookings
+        WHERE user_id = $1
+        ORDER BY date DESC, start_time DESC
+        OFFSET $2 
+        LIMIT $3
+    `
+
+	rows, err := r.execRows(ctx, tx, query, userID, offset, 20)
+	if err != nil {
+		return nil, fmt.Errorf("ListBookingsForUser querying rows: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var b Booking
+		err = rows.Scan(
+			&b.ID,
+			&b.FacilityID,
+			&b.UserID,
+			&b.Date,
+			&b.StartTime,
+			&b.EndTime,
+			&b.Note,
+			&b.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("ListBookingsForUser scanning: %w", err)
+		}
+
+		resp = append(resp, b)
+	}
+
 	return resp, nil
 }

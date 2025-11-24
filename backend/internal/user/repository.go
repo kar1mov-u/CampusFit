@@ -15,6 +15,7 @@ type UserRepostiory interface {
 	DeleteUser(context.Context, uuid.UUID) bool
 	UpdateUser(context.Context, User) (User, error)
 	GetRole(context.Context, uuid.UUID) (string, error)
+	ListUsers(ctx context.Context, email string, offset int) ([]User, error)
 }
 
 //----------------------- this is the implementation of the userRepo, for now i just have 1 , so can keep in the same file, later might change
@@ -109,6 +110,46 @@ func (u *UserRepositoryPostgres) GetByEmail(ctx context.Context, email string) (
 	}
 
 	return id, hash, nil
+
+}
+
+func (u *UserRepositoryPostgres) ListUsers(ctx context.Context, email string, offset int) ([]User, error) {
+	query := `SELECT user_id, email, first_name, last_name, password,
+			 phone, credit_score, role, is_active, created_at, updated_at
+			FROM users
+			WHERE ($1 = '' OR email ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%')
+			ORDER BY created_at DESC
+			OFFSET $2
+			LIMIT  $3`
+
+	rows, err := u.pool.Query(ctx, query, email, offset, 20)
+	if err != nil {
+		return []User{}, fmt.Errorf("repository.ListUsers Falied to qeury users %w", err)
+	}
+	defer rows.Close()
+
+	resp := make([]User, 0)
+	for rows.Next() {
+		var user User
+		err := rows.Scan(
+			&user.ID,
+			&user.Email,
+			&user.FirstName,
+			&user.LastName,
+			&user.Password,
+			&user.Phone,
+			&user.CreditScore,
+			&user.Role,
+			&user.IsActive,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return []User{}, fmt.Errorf("repository.LitsUsers Failed to scan rows :%w", err)
+		}
+		resp = append(resp, user)
+	}
+	return resp, nil
 
 }
 

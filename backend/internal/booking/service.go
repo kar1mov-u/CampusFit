@@ -61,6 +61,10 @@ func (s *BookingService) CreateNewBooking(ctx context.Context, data Booking) err
 	return nil
 }
 
-func (s *BookingService) ListBookings(ctx context.Context, facilID uuid.UUID, date time.Time) ([]Booking, error) {
+func (s *BookingService) ListBookingsForFacility(ctx context.Context, facilID uuid.UUID, date time.Time) ([]Booking, error) {
 	return s.bookingRepo.ListBookigsForFacility(ctx, nil, facilID, date)
+}
+
+func (s *BookingService) ListBookingForUser(ctx context.Context, userID uuid.UUID, offset int) ([]Booking, error) {
+	return s.bookingRepo.ListBookingsForUser(ctx, nil, userID, offset)
 }

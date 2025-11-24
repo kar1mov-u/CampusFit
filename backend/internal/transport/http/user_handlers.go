@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"t/internal/transport/dto"
 
 	"github.com/go-chi/chi/v5"
@@ -132,4 +133,52 @@ func (s *Server) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	respondWithJSON(w, http.StatusOK, userResponse, "user found")
+}
+
+func (s *Server) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
+	//check is the user is admin
+	userID, err := GetID(r.Context())
+	if err != nil {
+		s.logger.Warn("invalid userID from context", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid userID in context")
+		return
+	}
+
+	// if id's do not mathc then user should be the admin!!!
+	if !s.authService.IsAdmin(r.Context(), userID) {
+		s.logger.Warn("user is not admin")
+		respondWithJSON(w, http.StatusForbidden, nil, "access denied")
+		return
+	}
+
+	//get the offset from the query parameter and convert to int
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		s.logger.Warn("offset is not int value", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "offset should be interger")
+		return
+	}
+
+	//get the keyword for search if provided
+	keyword := r.URL.Query().Get("keyword")
+
+	users, err := s.userService.ListUsers(r.Context(), keyword, offset)
+	if err != nil {
+		s.logger.Warn("failed to list users", zap.Error(err))
+		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to list users")
+		return
+	}
+
+	usersDto := make([]dto.UserResponseDTO, 0, len(users))
+	for _, user := range users {
+		var userDto dto.UserResponseDTO
+		userDto.FromModel(user)
+		usersDto = append(usersDto, userDto)
+	}
+	respondWithJSON(w, http.StatusOK, usersDto, "successfully listed users")
+
 }

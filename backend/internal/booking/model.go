@@ -9,6 +9,7 @@ import (
 type Booking struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
+	UserName   string
 	FacilityID uuid.UUID
 	Date       time.Time // date only (no time)
 	StartTime  time.Time // time-only

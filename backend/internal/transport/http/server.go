@@ -78,6 +78,9 @@ func (s *Server) registerHandlers() {
 
 			pro.Get("/users/{id}", s.GetUserHandler)
 			pro.Get("/users/me", s.WhoAmI)
+			pro.Get("/users", s.ListUsersHandler)
+
+			pro.Get("/users/{id}/bookings", s.ListUserBookingsHandler)
 
 			//handler to get just 1 facility
 			pro.Get("/facility/{id}", s.GetFacilityHandler)
@@ -91,7 +94,7 @@ func (s *Server) registerHandlers() {
 			pro.Delete("/facility/{id}", s.DeleteFacilityHandler)
 
 			pro.Post("/bookings", s.CreateBookingHandler)
-			pro.Get("/bookings/facility/{facility_id}", s.ListBookingsHandler)
+			pro.Get("/bookings/facility/{facility_id}", s.ListFacilityBookingsHandler)
 		})
 
 	})
