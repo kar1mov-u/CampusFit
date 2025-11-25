@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { facilityService } from '../../api/facility';
+import { facilityApi } from '../../api/facility';
 import { Facility, CreateFacilityRequest } from '../../types';
 
 const FacilitiesManagement: React.FC = () => {
@@ -7,13 +7,13 @@ const FacilitiesManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
-  const [formData, setFormData] = useState<CreateFacilityRequest>({
+  const [formData, setFormData] = useState<Partial<Facility>>({
     name: '',
     type: 'football',
     description: '',
-    capacity: 10,
-    open_time: '08:00',
-    close_time: '22:00',
+    capacity: 0,
+    open_time: '',
+    close_time: '',
     image_url: '',
     is_active: true,
   });
@@ -24,8 +24,8 @@ const FacilitiesManagement: React.FC = () => {
 
   const loadFacilities = async () => {
     try {
-      const data = await facilityService.getAll();
-      setFacilities(data);
+      const data = await facilityApi.getAll();
+      setFacilities(data.data);
     } catch (err) {
       console.error('Failed to load facilities', err);
     } finally {
@@ -37,9 +37,10 @@ const FacilitiesManagement: React.FC = () => {
     e.preventDefault();
     try {
       if (editingFacility) {
-        await facilityService.update(editingFacility.id, formData);
+        await facilityApi.update(editingFacility.id, formData);
       } else {
-        await facilityService.create(formData);
+        const { is_active, ...createData } = formData as any;
+        await facilityApi.create(createData);
       }
       setShowModal(false);
       resetForm();
@@ -52,7 +53,7 @@ const FacilitiesManagement: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this facility?')) {
       try {
-        await facilityService.delete(id);
+        await facilityApi.delete(id);
         loadFacilities();
       } catch (err: any) {
         alert(err.response?.data?.message || 'Delete failed');
@@ -151,11 +152,10 @@ const FacilitiesManagement: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      facility.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${facility.is_active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}
                   >
                     {facility.is_active ? 'Active' : 'Inactive'}
                   </span>

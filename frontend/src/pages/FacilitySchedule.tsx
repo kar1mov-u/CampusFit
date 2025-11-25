@@ -1,10 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { facilityService } from '../api/facility';
-import { bookingService } from '../api/booking';
+import { facilityApi } from '../api/facility';
+import { bookingApi } from '../api/booking';
 import { Facility, Booking } from '../types';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isSameDay, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  Users,
+  MapPin,
+  ArrowLeft,
+  Check,
+  X,
+  Info,
+  Loader2,
+  ChevronRight,
+  ChevronLeft
+} from 'lucide-react';
+import { cn } from '../lib/utils';
+import ReviewSection from '../components/ReviewSection';
 
 const FacilitySchedule: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,30 +28,40 @@ const FacilitySchedule: React.FC = () => {
   const { user } = useAuth();
   const [facility, setFacility] = useState<Facility | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Monday
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<number[]>([]);
   const [bookingNote, setBookingNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadData();
     }
-  }, [id, selectedDate]);
+  }, [id, currentWeekStart]);
 
   const loadData = async () => {
     try {
-      // Fetch facility data first
-      const facilityData = await facilityService.getById(id!);
-      setFacility(facilityData);
+      setLoading(true);
+      const facilityData = await facilityApi.getById(id!);
+      setFacility(facilityData.data);
 
-      // Try to fetch bookings, but don't fail if endpoint doesn't exist yet
+      // Fetch bookings for the entire week
+      const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+      const weekDays = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
+
       try {
-        const bookingsData = await bookingService.getByFacility(id!, format(selectedDate, 'yyyy-MM-dd'));
-        setBookings(bookingsData);
+        // Fetch bookings for each day of the week
+        const allBookingsPromises = weekDays.map(day =>
+          bookingApi.getByFacility(id!, format(day, 'yyyy-MM-dd'))
+        );
+        const allBookingsResults = await Promise.all(allBookingsPromises);
+        const allBookings = allBookingsResults.flatMap(result => result.data);
+        setBookings(allBookings);
       } catch (bookingErr) {
-        console.log('Bookings endpoint not available yet, using empty bookings');
+        console.log('Bookings endpoint error', bookingErr);
         setBookings([]);
       }
     } catch (err) {
@@ -61,11 +87,11 @@ const FacilitySchedule: React.FC = () => {
     return slots;
   };
 
-  const getSlotStatus = (hour: number): 'available' | 'booked' | 'my-booking' => {
+  const getSlotStatus = (hour: number, date: Date): 'available' | 'booked' | 'my-booking' => {
     const booking = bookings.find((b) => {
       const startHour = parseInt(b.start_time.split(':')[0]);
       const endHour = parseInt(b.end_time.split(':')[0]);
-      return hour >= startHour && hour < endHour && !b.is_canceled;
+      return hour >= startHour && hour < endHour && !b.is_canceled && isSameDay(new Date(b.date), date);
     });
 
     if (!booking) return 'available';
@@ -73,96 +99,101 @@ const FacilitySchedule: React.FC = () => {
     return 'booked';
   };
 
-  const isSlotSelected = (hour: number) => selectedSlots.includes(hour);
+  const isSlotSelected = (hour: number, date: Date) => {
+    return selectedSlots.some(slot => slot === hour) && isSameDay(date, selectedDate);
+  };
 
-  const handleSlotClick = (hour: number) => {
-    const status = getSlotStatus(hour);
+  const handleSlotClick = (hour: number, date: Date) => {
+    // Prevent booking on past dates
+    const isPastDate = date < new Date(new Date().setHours(0, 0, 0, 0));
+    if (isPastDate) return;
+
+    // Set the selected date when clicking a slot
+    setSelectedDate(date);
+
+    const status = getSlotStatus(hour, date);
     if (status !== 'available') return;
 
-    if (isSlotSelected(hour)) {
-      // Deselect
+    if (isSlotSelected(hour, date)) {
       setSelectedSlots(selectedSlots.filter(h => h !== hour));
     } else {
-      // Only allow consecutive slots (max 2)
       if (selectedSlots.length === 0) {
         setSelectedSlots([hour]);
       } else if (selectedSlots.length === 1) {
         const existing = selectedSlots[0];
         if (Math.abs(hour - existing) === 1) {
-          // Consecutive slot
           setSelectedSlots([Math.min(hour, existing), Math.max(hour, existing)]);
         } else {
-          // Non-consecutive, replace
           setSelectedSlots([hour]);
         }
       } else {
-        // Already have 2 slots, replace with new selection
         setSelectedSlots([hour]);
       }
     }
   };
 
-  const openBookingModal = () => {
-    if (selectedSlots.length > 0) {
-      setShowBookingModal(true);
-    }
+  const getWeekDays = () => {
+    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
+  };
+
+  const handlePreviousWeek = () => {
+    setCurrentWeekStart(subWeeks(currentWeekStart, 1));
+    setSelectedSlots([]);
+  };
+
+  const handleNextWeek = () => {
+    setCurrentWeekStart(addWeeks(currentWeekStart, 1));
+    setSelectedSlots([]);
   };
 
   const handleBooking = async () => {
     if (selectedSlots.length === 0 || !id) return;
 
     try {
+      setSubmitting(true);
       const sortedSlots = [...selectedSlots].sort((a, b) => a - b);
       const startHour = sortedSlots[0];
       const endHour = sortedSlots[sortedSlots.length - 1] + 1;
 
-      await bookingService.create({
+      await bookingApi.create({
         facility_id: id,
         date: format(selectedDate, 'yyyy-MM-dd'),
         start_time: `${startHour.toString().padStart(2, '0')}:00`,
         end_time: `${endHour.toString().padStart(2, '0')}:00`,
         note: bookingNote,
       });
-      
+
       setShowBookingModal(false);
       setSelectedSlots([]);
       setBookingNote('');
       loadData();
-      alert('Booking created successfully!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create booking');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const getNextDays = () => {
-    const days = [];
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      days.push(addDays(today, i));
-    }
-    return days;
-  };
-
-  if (loading) {
+  if (loading && !facility) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!facility) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Facility not found</h2>
-          <button
-            onClick={() => navigate('/')}
-            className="text-primary-600 hover:text-primary-700"
-          >
-            Go back to facilities
-          </button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <h2 className="text-2xl font-bold">Facility not found</h2>
+        <button
+          onClick={() => navigate('/')}
+          className="text-primary hover:underline flex items-center"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to facilities
+        </button>
       </div>
     );
   }
@@ -170,279 +201,277 @@ const FacilitySchedule: React.FC = () => {
   const timeSlots = generateTimeSlots();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/')}
-            className="text-primary-600 hover:text-primary-700 mb-4 flex items-center font-medium"
-          >
-            ← Back to facilities
-          </button>
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h1 className="text-4xl font-bold text-gray-900 mb-3">{facility.name}</h1>
-                <p className="text-gray-600 text-lg mb-6">{facility.description}</p>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-100 p-3 rounded-lg">
-                      <span className="text-2xl">🏃</span>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Type</p>
-                      <p className="font-semibold capitalize">{facility.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-100 p-3 rounded-lg">
-                      <span className="text-2xl">👥</span>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Capacity</p>
-                      <p className="font-semibold">{facility.capacity} people</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-100 p-3 rounded-lg">
-                      <span className="text-2xl">🕐</span>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Opens</p>
-                      <p className="font-semibold">{facility.open_time}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-100 p-3 rounded-lg">
-                      <span className="text-2xl">🕐</span>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Closes</p>
-                      <p className="font-semibold">{facility.close_time}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div className="space-y-8 pb-20">
+      {/* Header */}
+      <div className="space-y-4">
+        <button
+          onClick={() => navigate('/')}
+          className="text-muted-foreground hover:text-foreground flex items-center transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to facilities
+        </button>
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">{facility.name}</h1>
+            <p className="text-muted-foreground mt-1 text-lg">{facility.description}</p>
+          </div>
+          <div className="flex gap-2">
+            <span className={cn(
+              "px-3 py-1 rounded-full text-sm font-medium border",
+              facility.is_active
+                ? "bg-green-500/10 text-green-600 border-green-500/20"
+                : "bg-red-500/10 text-red-600 border-red-500/20"
+            )}>
+              {facility.is_active ? 'Active' : 'Maintenance'}
+            </span>
           </div>
         </div>
 
-        {/* Date Selector */}
-        <div className="mb-6 bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4 text-gray-900">Select a Date</h2>
-          <div className="grid grid-cols-7 gap-3">
-            {getNextDays().map((day) => {
-              const isSelected = format(day, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-              const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-              return (
-                <button
-                  key={day.toISOString()}
-                  onClick={() => setSelectedDate(day)}
-                  className={`p-4 rounded-xl text-center transition-all transform hover:scale-105 ${
-                    isSelected
-                      ? 'bg-primary-600 text-white shadow-lg'
-                      : isToday
-                      ? 'bg-primary-100 text-primary-700 border-2 border-primary-300'
-                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  <div className="text-xs font-medium uppercase">{format(day, 'EEE')}</div>
-                  <div className="text-2xl font-bold my-1">{format(day, 'd')}</div>
-                  <div className="text-xs">{format(day, 'MMM')}</div>
-                </button>
-              );
-            })}
+        <div className="flex flex-wrap gap-6 text-sm text-muted-foreground border-y border-border py-4">
+          <div className="flex items-center">
+            <MapPin className="w-4 h-4 mr-2" />
+            <span className="capitalize">{facility.type} Court</span>
           </div>
-        </div>
-
-        {/* Schedule Grid */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Available Time Slots
-            </h2>
-            <p className="text-gray-600 mt-1">
-              {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              Click on available slots to select. You can select 1 or 2 consecutive hours.
-            </p>
+          <div className="flex items-center">
+            <Users className="w-4 h-4 mr-2" />
+            <span>Capacity: {facility.capacity}</span>
           </div>
-          
-          {timeSlots.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg">No time slots available</p>
-              <p className="text-sm mt-2">This facility may be closed on this day</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {timeSlots.map((slot) => {
-                const status = getSlotStatus(slot.hour);
-                const selected = isSlotSelected(slot.hour);
-                
-                let colorClasses = '';
-                let cursorClass = 'cursor-pointer';
-                let statusIcon = '';
-                
-                if (selected) {
-                  colorClasses = 'bg-yellow-100 border-yellow-400 text-yellow-900 ring-2 ring-yellow-400';
-                  statusIcon = '📌 Selected';
-                } else if (status === 'my-booking') {
-                  colorClasses = 'bg-blue-50 text-blue-700 border-2 border-blue-300';
-                  cursorClass = 'cursor-default';
-                  statusIcon = '✓ Your Booking';
-                } else if (status === 'booked') {
-                  colorClasses = 'bg-red-50 text-red-700 border-2 border-red-200 opacity-60';
-                  cursorClass = 'cursor-not-allowed';
-                  statusIcon = '🔒 Booked';
-                } else {
-                  colorClasses = 'bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 hover:border-green-300 shadow-sm hover:shadow-md';
-                  statusIcon = '✓ Available';
-                }
-
-                return (
-                  <button
-                    key={slot.time}
-                    onClick={() => handleSlotClick(slot.hour)}
-                    disabled={status !== 'available'}
-                    className={`p-5 rounded-xl text-center font-semibold transition-all transform hover:scale-105 ${colorClasses} ${cursorClass}`}
-                  >
-                    <div className="text-xl font-bold">{slot.time}</div>
-                    <div className="text-xs mt-2 font-medium uppercase tracking-wide">
-                      {statusIcon}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {selectedSlots.length > 0 && (
-            <div className="mt-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    Selected: {selectedSlots.sort((a, b) => a - b).map(h => `${h}:00`).join(' - ')} 
-                    {selectedSlots.length > 1 ? ` - ${Math.max(...selectedSlots) + 1}:00` : ` - ${selectedSlots[0] + 1}:00`}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Duration: {selectedSlots.length} hour{selectedSlots.length > 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSelectedSlots([])}
-                    className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-gray-700"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={openBookingModal}
-                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold shadow-md hover:shadow-lg"
-                  >
-                    Book Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Legend */}
-        <div className="mt-6 flex items-center justify-center gap-8 text-sm bg-white rounded-lg py-4 px-6 shadow-sm flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-green-50 border-2 border-green-200 rounded"></div>
-            <span className="font-medium text-gray-700">Available</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-blue-50 border-2 border-blue-300 rounded"></div>
-            <span className="font-medium text-gray-700">Your Booking</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-red-50 border-2 border-red-200 rounded"></div>
-            <span className="font-medium text-gray-700">Booked by Others</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-400 rounded"></div>
-            <span className="font-medium text-gray-700">Selected</span>
+          <div className="flex items-center">
+            <Clock className="w-4 h-4 mr-2" />
+            <span>{facility.open_time} - {facility.close_time}</span>
           </div>
         </div>
       </div>
 
-      {/* Booking Modal */}
-      {showBookingModal && selectedSlots.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6 text-gray-900">Confirm Your Booking</h3>
-            <div className="space-y-4 mb-6 bg-gray-50 p-5 rounded-xl">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🏢</span>
-                <div>
-                  <p className="text-xs text-gray-500">Facility</p>
-                  <p className="font-semibold text-gray-900">{facility?.name}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📅</span>
-                <div>
-                  <p className="text-xs text-gray-500">Date</p>
-                  <p className="font-semibold text-gray-900">{format(selectedDate, 'MMMM d, yyyy')}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⏰</span>
-                <div>
-                  <p className="text-xs text-gray-500">Time</p>
-                  <p className="font-semibold text-gray-900">
-                    {Math.min(...selectedSlots).toString().padStart(2, '0')}:00 - {(Math.max(...selectedSlots) + 1).toString().padStart(2, '0')}:00
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⏱️</span>
-                <div>
-                  <p className="text-xs text-gray-500">Duration</p>
-                  <p className="font-semibold text-gray-900">{selectedSlots.length} hour{selectedSlots.length > 1 ? 's' : ''}</p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Note Input */}
-            <div className="mb-6">
-              <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
-                Add a note (optional)
-              </label>
-              <textarea
-                id="note"
-                value={bookingNote}
-                onChange={(e) => setBookingNote(e.target.value)}
-                placeholder="E.g., Team practice, Basketball game, etc."
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
-                rows={3}
-              />
-            </div>
+      {/* Week Navigation */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold flex items-center">
+            <CalendarIcon className="w-5 h-5 mr-2" />
+            Week of {format(currentWeekStart, 'MMM d')} - {format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'MMM d, yyyy')}
+          </h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePreviousWeek}
+              className="p-2 rounded-lg border border-input hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleNextWeek}
+              className="p-2 rounded-lg border border-input hover:bg-muted transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-            <div className="flex gap-3">
+        {/* Day Selector */}
+        <div className="flex overflow-x-auto pb-4 gap-3 no-scrollbar">
+          {getWeekDays().map((day) => {
+            const isSelected = isSameDay(day, selectedDate);
+            const isToday = isSameDay(day, new Date());
+            const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+            return (
               <button
-                onClick={() => {
-                  setShowBookingModal(false);
-                  setBookingNote('');
-                }}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                key={day.toISOString()}
+                onClick={() => setSelectedDate(day)}
+                className={cn(
+                  "flex-shrink-0 min-w-[80px] p-3 rounded-xl border transition-all duration-200",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary shadow-lg scale-105"
+                    : "bg-card hover:border-primary/50 hover:bg-muted",
+                  isToday && !isSelected && "border-primary/50",
+                  isPast && !isSelected && "opacity-70"
+                )}
               >
-                Cancel
+                <div className="text-xs font-medium uppercase opacity-80">{format(day, 'EEE')}</div>
+                <div className="text-xl font-bold my-1">{format(day, 'd')}</div>
+                <div className="text-xs opacity-80">{format(day, 'MMM')}</div>
               </button>
-              <button
-                onClick={handleBooking}
-                className="flex-1 px-6 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
-              >
-                Confirm Booking
-              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Time Slots for Selected Day */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold flex items-center">
+            <Clock className="w-5 h-5 mr-2" />
+            Available Slots - {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+          </h2>
+          <div className="flex gap-4 text-xs md:text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-secondary border border-border"></div>
+              <span>Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-primary"></div>
+              <span>Selected</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500/20 border border-blue-500/50"></div>
+              <span>Your Booking</span>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {timeSlots.map((slot) => {
+            const status = getSlotStatus(slot.hour, selectedDate);
+            const selected = isSlotSelected(slot.hour, selectedDate);
+            const isPastDate = selectedDate < new Date(new Date().setHours(0, 0, 0, 0));
+
+            // Only show available slots and user's own bookings
+            if (status === 'booked') {
+              return null;
+            }
+
+            return (
+              <motion.button
+                key={slot.time}
+                whileHover={status === 'available' && !isPastDate ? { scale: 1.02 } : {}}
+                whileTap={status === 'available' && !isPastDate ? { scale: 0.98 } : {}}
+                onClick={() => handleSlotClick(slot.hour, selectedDate)}
+                disabled={status !== 'available' || isPastDate}
+                className={cn(
+                  "p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
+                  status === 'available' && !selected && !isPastDate && "bg-card hover:border-primary/50 cursor-pointer",
+                  status === 'available' && !selected && isPastDate && "bg-card opacity-50 cursor-not-allowed",
+                  selected && "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20",
+                  status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default"
+                )}
+              >
+                <div className="text-lg font-bold">{slot.time}</div>
+                <div className="text-xs mt-1 font-medium flex items-center justify-center gap-1">
+                  {selected && <Check className="w-3 h-3" />}
+                  {status === 'my-booking' && <Users className="w-3 h-3" />}
+                  {status === 'available' && !selected && 'Available'}
+                  {selected && 'Selected'}
+                  {status === 'my-booking' && 'Your Booking'}
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Booking Action Bar */}
+      <AnimatePresence>
+        {selectedSlots.length > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t border-border z-40"
+          >
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              <div className="hidden md:block">
+                <p className="font-semibold">
+                  {selectedSlots.length} slot{selectedSlots.length > 1 ? 's' : ''} selected
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {format(selectedDate, 'MMMM d, yyyy')} • {Math.min(...selectedSlots)}:00 - {Math.max(...selectedSlots) + 1}:00
+                </p>
+              </div>
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <button
+                  onClick={() => setSelectedSlots([])}
+                  className="px-6 py-2.5 rounded-lg border border-input hover:bg-muted transition-colors font-medium"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => setShowBookingModal(true)}
+                  className="flex-1 md:flex-none px-8 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold shadow-lg shadow-primary/25"
+                >
+                  Book Selected Slots
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Booking Modal */}
+      <AnimatePresence>
+        {showBookingModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border overflow-hidden"
+            >
+              <div className="p-6 space-y-6">
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold">Confirm Booking</h3>
+                  <p className="text-muted-foreground mt-1">Please review your booking details</p>
+                </div>
+
+                <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Facility</span>
+                    <span className="font-medium">{facility.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="font-medium">{format(selectedDate, 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Time</span>
+                    <span className="font-medium">
+                      {Math.min(...selectedSlots)}:00 - {Math.max(...selectedSlots) + 1}:00
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Add a note (optional)</label>
+                  <textarea
+                    value={bookingNote}
+                    onChange={(e) => setBookingNote(e.target.value)}
+                    placeholder="E.g., Team practice..."
+                    className="w-full min-h-[80px] p-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowBookingModal(false)}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-input hover:bg-muted transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBooking}
+                    disabled={submitting}
+                    className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Confirm
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reviews Section */}
+      <div className="border-t border-border pt-12 mt-12">
+        <ReviewSection facilityId={id!} />
+      </div>
     </div>
   );
 };

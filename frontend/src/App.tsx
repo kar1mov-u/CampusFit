@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Facilities from './pages/Facilities';
 import FacilitySchedule from './pages/FacilitySchedule';
 import Admin from './pages/Admin';
+import MyBookings from './pages/MyBookings';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           >
             <Route index element={<Facilities />} />
             <Route path="facility/:id" element={<FacilitySchedule />} />
+            <Route path="bookings" element={<MyBookings />} />
             <Route path="admin" element={<Admin />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
