@@ -8,6 +8,7 @@ import (
 	"t/internal/booking"
 	"t/internal/config"
 	"t/internal/facility"
+	"t/internal/review"
 	"t/internal/transport/http"
 	"t/internal/user"
 	pg "t/pkg/postgres"
@@ -40,7 +41,11 @@ func main() {
 	bookingRep := booking.NewBookingRepositoryPostgres(pGpool)
 	bookingSrv := booking.NewBookingService(bookingRep)
 
-	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv)
+	//create reviews
+	reviewRep := review.NewReviewRepositoryPostgres(pGpool)
+	reviewSrv := review.NewReviewService(reviewRep)
+
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv)
 
 	srv.Start()
 

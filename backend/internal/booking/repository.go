@@ -3,6 +3,7 @@ package booking
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,9 +15,13 @@ type BookingRepository interface {
 	UserHasBooking(ctx context.Context, tx pgx.Tx, userID uuid.UUID, facilID uuid.UUID, date time.Time) (bool, error)                  //checks user has booking in that facility in that day
 	UserHasOverlap(ctx context.Context, tx pgx.Tx, userID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error)     //checks user has overalp of bookings with other facilities
 	BookingHasOverlap(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error) //checks if the booking on that facility has not  overalp on that time interval
+	HasTooManyBookings(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (bool, error)
 	CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error
 	ListBookigsForFacility(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, date time.Time) ([]Booking, error)
 	ListBookingsForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID, offset int) ([]Booking, error)
+
+	CancelBooking(ctx context.Context, tx pgx.Tx, bookingID uuid.UUID, adminNote string) error
+	ListBookings(ctx context.Context, tx pgx.Tx, start_date time.Time, end_date time.Time, offset int) ([]Booking, error)
 	BeginTx(context.Context) (pgx.Tx, error)
 }
 
@@ -114,6 +119,28 @@ func (r *BookingRepositoryPostgres) BookingHasOverlap(ctx context.Context, tx pg
 	return count > 0, nil
 }
 
+func (r *BookingRepositoryPostgres) HasTooManyBookings(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (bool, error) {
+	// Count bookings that are in the future OR today but haven't ended yet
+	query := `
+		SELECT COUNT(*) 
+		FROM bookings 
+		WHERE user_id = $1 
+		  AND is_canceled = FALSE
+		  AND (
+		      date > CURRENT_DATE 
+		      OR (date = CURRENT_DATE AND end_time > LOCALTIME)
+		  )
+	`
+
+	var count int
+	err := r.execRow(ctx, tx, query, userID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("HasTooManyBookings query error: %w", err)
+	}
+	log.Println(count)
+	return count >= 3, nil
+}
+
 func (r *BookingRepositoryPostgres) CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error {
 	query := `
         INSERT INTO bookings (
@@ -181,7 +208,7 @@ func (r *BookingRepositoryPostgres) ListBookingsForUser(ctx context.Context, tx 
 	resp := make([]Booking, 0)
 
 	query := `
-        SELECT booking_id, facility_id, user_id, date, start_time, end_time, note, created_at
+        SELECT booking_id, facility_id, user_id, date, start_time, end_time, note, is_canceled, created_at
         FROM bookings
         WHERE user_id = $1
         ORDER BY date DESC, start_time DESC
@@ -205,6 +232,7 @@ func (r *BookingRepositoryPostgres) ListBookingsForUser(ctx context.Context, tx 
 			&b.StartTime,
 			&b.EndTime,
 			&b.Note,
+			&b.IsCanceled,
 			&b.CreatedAt,
 		)
 		if err != nil {
@@ -215,4 +243,44 @@ func (r *BookingRepositoryPostgres) ListBookingsForUser(ctx context.Context, tx 
 	}
 
 	return resp, nil
+}
+
+func (r *BookingRepositoryPostgres) ListBookings(ctx context.Context, tx pgx.Tx, start_date time.Time, end_date time.Time, offset int) ([]Booking, error) {
+	query := `SELECT booking_id, facility_id, user_id, date, start_time, end_time, note, is_canceled, created_at
+        	FROM bookings WHERE date BETWEEN $1 AND $2 ORDER BY date DESC, start_time DESC OFFSET $3 LIMIT 20`
+	rows, err := r.execRows(ctx, tx, query, start_date, end_date, offset)
+	if err != nil {
+		return []Booking{}, fmt.Errorf("repository.ListBookings Failed to query rows: %w", err)
+	}
+	defer rows.Close()
+
+	bookings := make([]Booking, 0)
+
+	for rows.Next() {
+		var b Booking
+		err = rows.Scan(
+			&b.ID,
+			&b.FacilityID,
+			&b.UserID,
+			&b.Date,
+			&b.StartTime,
+			&b.EndTime,
+			&b.Note,
+			&b.IsCanceled,
+			&b.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("repository.ListBookings scanning rows: %w", err)
+		}
+
+		bookings = append(bookings, b)
+
+	}
+
+	return bookings, nil
+}
+
+func (r *BookingRepositoryPostgres) CancelBooking(ctx context.Context, tx pgx.Tx, bookingID uuid.UUID, adminNote string) error {
+	query := `UPDATE bookings SET is_canceled=TRUE, admin_note=$1 WHERE booking_id=$2 `
+	return r.exec(ctx, tx, query, adminNote, bookingID)
 }

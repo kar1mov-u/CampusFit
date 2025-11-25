@@ -6,6 +6,7 @@ import (
 	"t/internal/auth"
 	"t/internal/booking"
 	"t/internal/facility"
+	"t/internal/review"
 	"t/internal/user"
 
 	"github.com/go-chi/chi/v5"
@@ -22,11 +23,12 @@ type Server struct {
 	authService     *auth.AuthService
 	facilityService *facility.FacilityService
 	bookingService  *booking.BookingService
+	reviewService   *review.ReviewService
 	validator       *validator.Validate
 	logger          *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -44,6 +46,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 		validator:       validator,
 		userService:     userSrv,
 		bookingService:  bookSrv,
+		reviewService:   reviewSrv,
 		authService:     authSrv,
 		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
@@ -56,7 +59,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 
 func (s *Server) registerHandlers() {
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "https://your-frontend.com"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://200.60.0.245:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -94,7 +97,15 @@ func (s *Server) registerHandlers() {
 			pro.Delete("/facility/{id}", s.DeleteFacilityHandler)
 
 			pro.Post("/bookings", s.CreateBookingHandler)
+			pro.Post("/bookings/cancel/{booking_id}", s.CancelBookingHandler)
+			pro.Get("/bookings", s.ListBookingsHandler)
 			pro.Get("/bookings/facility/{facility_id}", s.ListFacilityBookingsHandler)
+
+			// Review endpoints
+			pro.Post("/facility/{facility_id}/review", s.CreateFacilityReviewHandler)
+			pro.Delete("/facility/review/{review_id}", s.DeleteFacilityReviewHandler)
+			pro.Get("/facility/{facility_id}/reviews", s.GetFacilityReviewsHandler)
+			pro.Get("/facility/{facility_id}/rating", s.GetFacilityRatingHandler)
 		})
 
 	})

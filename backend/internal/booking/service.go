@@ -50,6 +50,14 @@ func (s *BookingService) CreateNewBooking(ctx context.Context, data Booking) err
 		return fmt.Errorf("facility is already booked for this interval")
 	}
 
+	hasTooManyBookings, err := s.bookingRepo.HasTooManyBookings(ctx, tx, data.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to check too many bookings: %w", err)
+	}
+	if hasTooManyBookings {
+		return fmt.Errorf("user has 3 upcoming bookings. Cannot book another one")
+	}
+
 	if err := s.bookingRepo.CreateBooking(ctx, tx, data); err != nil {
 		return fmt.Errorf("failed to create booking: %w", err)
 	}
@@ -67,4 +75,12 @@ func (s *BookingService) ListBookingsForFacility(ctx context.Context, facilID uu
 
 func (s *BookingService) ListBookingForUser(ctx context.Context, userID uuid.UUID, offset int) ([]Booking, error) {
 	return s.bookingRepo.ListBookingsForUser(ctx, nil, userID, offset)
+}
+
+func (s *BookingService) ListBookings(ctx context.Context, start_date time.Time, end_date time.Time, offset int) ([]Booking, error) {
+	return s.bookingRepo.ListBookings(ctx, nil, start_date, end_date, offset)
+}
+
+func (s *BookingService) CancelBooking(ctx context.Context, bookingID uuid.UUID, admin_note string) error {
+	return s.bookingRepo.CancelBooking(ctx, nil, bookingID, admin_note)
 }

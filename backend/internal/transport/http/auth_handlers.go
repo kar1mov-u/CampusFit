@@ -24,5 +24,4 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondWithJSON(w, http.StatusOK, map[string]string{"token": token}, "logged in successfully")
-
 }

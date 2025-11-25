@@ -53,7 +53,7 @@ func (s *Server) CreateBookingHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		s.logger.Warn("failed to create booking", zap.Error(err))
-		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to craete booking")
+		respondWithJSON(w, http.StatusInternalServerError, nil, err.Error())
 		return
 	}
 	respondWithJSON(w, http.StatusOK, nil, "successfully created the booking")
@@ -81,14 +81,15 @@ func (s *Server) ListFacilityBookingsHandler(w http.ResponseWriter, r *http.Requ
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		s.logger.Warn("failed to parse the query date to correct format", zap.Error(err))
-
 		respondWithJSON(w, http.StatusBadRequest, nil, "invalid date format, expected YYYY-MM-DD:")
+		return
 	}
 
 	bookings, err := s.bookingService.ListBookingsForFacility(r.Context(), facilID, date)
 	if err != nil {
 		s.logger.Warn("failed to list bookings", zap.Error(err))
 		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to list bookings")
+		return
 	}
 
 	resp := make([]dto.BookingResponse, 0, len(bookings))
@@ -154,4 +155,98 @@ func (s *Server) ListUserBookingsHandler(w http.ResponseWriter, r *http.Request)
 
 	respondWithJSON(w, http.StatusOK, respDto, "successfuly listed bookings")
 
+}
+
+func (s *Server) ListBookingsHandler(w http.ResponseWriter, r *http.Request) {
+
+	userID, err := GetID(r.Context())
+	if err != nil {
+		s.logger.Warn("invalid userID from context", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid userID in context")
+		return
+	}
+
+	// if id's do not mathc then user should be the admin!!!
+	if !s.authService.IsAdmin(r.Context(), userID) {
+		s.logger.Warn("user is not admin")
+		respondWithJSON(w, http.StatusForbidden, nil, "access denied")
+		return
+	}
+
+	//get query parameters
+	offsetStr := r.URL.Query().Get("offset")
+	if offsetStr == "" {
+		offsetStr = "0"
+	}
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil {
+		s.logger.Warn("offset is not int value", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "offset should be interger")
+		return
+	}
+
+	startDateStr := r.URL.Query().Get("start_date")
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		s.logger.Warn("failed to parse the query start_date to correct format", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid start_date format, expected YYYY-MM-DD:")
+		return
+	}
+
+	endtDateStr := r.URL.Query().Get("date")
+	endDate, err := time.Parse("2006-01-02", endtDateStr)
+	if err != nil {
+		s.logger.Warn("failed to parse the query end_date to correct format", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "invalid end_date format, expected YYYY-MM-DD:")
+		return
+	}
+
+	bookngs, err := s.bookingService.ListBookings(r.Context(), startDate, endDate, offset)
+	if err != nil {
+		s.logger.Warn("failed to list bookings", zap.Error(err))
+		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to list bookings")
+		return
+	}
+
+	bookingsDto := make([]dto.BookingResponse, 0, len(bookngs))
+	for _, booking := range bookngs {
+		i := dto.ToBookingResponse(booking)
+
+		bookingsDto = append(bookingsDto, i)
+	}
+	respondWithJSON(w, http.StatusOK, bookingsDto, "successfuly listed bookings")
+}
+
+func (s *Server) CancelBookingHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "booking_id")
+	if idStr == "" {
+		s.logger.Warn("missing bookingID on path parameter")
+		http.Error(w, "missing booking id", http.StatusBadRequest)
+		return
+	}
+
+	bookingID, err := uuid.Parse(idStr)
+	if err != nil {
+		s.logger.Warn("invalid booking on path parameter")
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		AdminNote string `json:"admin_note"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.logger.Warn("failed to decode input", zap.Error(err))
+		respondWithJSON(w, http.StatusBadRequest, nil, "malformed input")
+		return
+	}
+
+	err = s.bookingService.CancelBooking(r.Context(), bookingID, req.AdminNote)
+	if err != nil {
+		s.logger.Warn("failed to cancel booking", zap.Error(err))
+		respondWithJSON(w, http.StatusInternalServerError, nil, "failed to cancel booking")
+		return
+	}
+	respondWithJSON(w, http.StatusOK, nil, "successfully canceled booking")
 }
