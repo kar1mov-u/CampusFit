@@ -16,8 +16,9 @@ type AuthService struct {
 }
 
 const (
-	ADMIN = "admin"
-	STAFF = "staff"
+	ADMIN   = "admin"
+	STAFF   = "staff"
+	TRAINER = "trainer"
 )
 
 func NewAuthSerivce(key string, userRep user.UserRepostiory) *AuthService {
@@ -54,8 +55,15 @@ func (s *AuthService) LoginUser(ctx context.Context, email, password string) (st
 
 func (s *AuthService) IsAdmin(ctx context.Context, id uuid.UUID) bool {
 	role, err := s.userRepo.GetRole(ctx, id)
-	log.Printf(role, err)
 	if err != nil || role != ADMIN {
+		return false
+	}
+	return true
+}
+
+func (s *AuthService) IsTrainer(ctx context.Context, id uuid.UUID) bool {
+	role, err := s.userRepo.GetRole(ctx, id)
+	if err != nil || role != TRAINER {
 		return false
 	}
 	return true

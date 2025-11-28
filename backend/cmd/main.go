@@ -9,6 +9,7 @@ import (
 	"t/internal/config"
 	"t/internal/facility"
 	"t/internal/review"
+	"t/internal/trainer"
 	"t/internal/transport/http"
 	"t/internal/user"
 	pg "t/pkg/postgres"
@@ -45,7 +46,11 @@ func main() {
 	reviewRep := review.NewReviewRepositoryPostgres(pGpool)
 	reviewSrv := review.NewReviewService(reviewRep)
 
-	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv)
+	//create trainer
+	trainerRep := trainer.NewTrainerRepositoryPostgres(pGpool)
+	trainerSrv := trainer.NewTrainerService(trainerRep)
+
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv, trainerSrv)
 
 	srv.Start()
 

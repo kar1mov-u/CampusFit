@@ -1,0 +1,3 @@
+DROP TABLE trainer_sessions;
+DROP TABLE trainer_weekly_schedule;
+DROP TABLE trainers;

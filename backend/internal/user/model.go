@@ -16,6 +16,7 @@ type User struct {
 	Phone       string
 	CreditScore int
 	IsActive    bool
+	IsTrainer   bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

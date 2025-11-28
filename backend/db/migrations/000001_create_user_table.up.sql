@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TYPE role AS ENUM ('admin', 'staff', 'student');
+CREATE TYPE role AS ENUM ('admin', 'staff', 'student', 'trainer');
 
 CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

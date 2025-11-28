@@ -57,6 +57,8 @@ func (u *UserRepositoryPostgres) GetByID(ctx context.Context, id uuid.UUID) (Use
 		return User{}, fmt.Errorf("userRepository.GetByID: %w", err)
 	}
 
+	//also get if its admin
+
 	return user, nil
 }
 

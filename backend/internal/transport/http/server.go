@@ -7,6 +7,7 @@ import (
 	"t/internal/booking"
 	"t/internal/facility"
 	"t/internal/review"
+	"t/internal/trainer"
 	"t/internal/user"
 
 	"github.com/go-chi/chi/v5"
@@ -24,11 +25,12 @@ type Server struct {
 	facilityService *facility.FacilityService
 	bookingService  *booking.BookingService
 	reviewService   *review.ReviewService
+	trainerService  *trainer.TrainerService
 	validator       *validator.Validate
 	logger          *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -47,6 +49,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 		userService:     userSrv,
 		bookingService:  bookSrv,
 		reviewService:   reviewSrv,
+		trainerService:  trainerSrv,
 		authService:     authSrv,
 		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
@@ -106,6 +109,13 @@ func (s *Server) registerHandlers() {
 			pro.Delete("/facility/review/{review_id}", s.DeleteFacilityReviewHandler)
 			pro.Get("/facility/{facility_id}/reviews", s.GetFacilityReviewsHandler)
 			pro.Get("/facility/{facility_id}/rating", s.GetFacilityRatingHandler)
+
+			// Trainer endpoints
+			pro.Post("/trainers", s.CreateTrainerHandler)
+			pro.Get("/trainers", s.ListTrainersHandler)
+			pro.Get("/trainers/{id}", s.GetTrainerHandler)
+			pro.Patch("/trainers/{id}", s.UpdateTrainerHandler)
+			pro.Delete("/trainers/{id}", s.DeleteTrainerHandler)
 		})
 
 	})

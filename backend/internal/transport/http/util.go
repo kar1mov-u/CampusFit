@@ -47,3 +47,29 @@ func GetID(ctx context.Context) (uuid.UUID, error) {
 	return uuid.Parse(str)
 
 }
+
+func (s *Server) isAdmin(ctx context.Context) (bool, error) {
+	id, err := GetID(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	//check if the user is admin
+	if !s.authService.IsAdmin(ctx, id) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *Server) isTrainer(ctx context.Context) (bool, error) {
+	id, err := GetID(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	//check if the user is trainer
+	if !s.authService.IsTrainer(ctx, id) {
+		return false, nil
+	}
+	return true, nil
+}
