@@ -104,9 +104,12 @@ const FacilitySchedule: React.FC = () => {
   };
 
   const handleSlotClick = (hour: number, date: Date) => {
-    // Prevent booking on past dates
-    const isPastDate = date < new Date(new Date().setHours(0, 0, 0, 0));
-    if (isPastDate) return;
+    // Prevent booking on past dates and times
+    const now = new Date();
+    const slotTime = new Date(date);
+    slotTime.setHours(hour, 0, 0, 0);
+
+    if (slotTime < now) return;
 
     // Set the selected date when clicking a slot
     setSelectedDate(date);
@@ -155,6 +158,16 @@ const FacilitySchedule: React.FC = () => {
       const sortedSlots = [...selectedSlots].sort((a, b) => a - b);
       const startHour = sortedSlots[0];
       const endHour = sortedSlots[sortedSlots.length - 1] + 1;
+
+      // Final check for past time
+      const now = new Date();
+      const bookingTime = new Date(selectedDate);
+      bookingTime.setHours(startHour, 0, 0, 0);
+
+      if (bookingTime < now) {
+        alert("Cannot book past time slots.");
+        return;
+      }
 
       await bookingApi.create({
         facility_id: id,
@@ -324,7 +337,10 @@ const FacilitySchedule: React.FC = () => {
           {timeSlots.map((slot) => {
             const status = getSlotStatus(slot.hour, selectedDate);
             const selected = isSlotSelected(slot.hour, selectedDate);
-            const isPastDate = selectedDate < new Date(new Date().setHours(0, 0, 0, 0));
+            const now = new Date();
+            const slotTime = new Date(selectedDate);
+            slotTime.setHours(slot.hour, 0, 0, 0);
+            const isPastSlot = slotTime < now;
 
             // Only show available slots and user's own bookings
             if (status === 'booked') {
@@ -334,14 +350,14 @@ const FacilitySchedule: React.FC = () => {
             return (
               <motion.button
                 key={slot.time}
-                whileHover={status === 'available' && !isPastDate ? { scale: 1.02 } : {}}
-                whileTap={status === 'available' && !isPastDate ? { scale: 0.98 } : {}}
+                whileHover={status === 'available' && !isPastSlot ? { scale: 1.02 } : {}}
+                whileTap={status === 'available' && !isPastSlot ? { scale: 0.98 } : {}}
                 onClick={() => handleSlotClick(slot.hour, selectedDate)}
-                disabled={status !== 'available' || isPastDate}
+                disabled={status !== 'available' || isPastSlot}
                 className={cn(
                   "p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
-                  status === 'available' && !selected && !isPastDate && "bg-card hover:border-primary/50 cursor-pointer",
-                  status === 'available' && !selected && isPastDate && "bg-card opacity-50 cursor-not-allowed",
+                  status === 'available' && !selected && !isPastSlot && "bg-card hover:border-primary/50 cursor-pointer",
+                  status === 'available' && !selected && isPastSlot && "bg-card opacity-50 cursor-not-allowed",
                   selected && "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20",
                   status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default"
                 )}

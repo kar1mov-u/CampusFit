@@ -23,7 +23,7 @@ CREATE TABLE trainer_weekly_schedule (
 
 CREATE TABLE trainer_sessions (
     session_id   UUID PRIMARY KEY,
-    schedule_id  UUID REFERENCES trainer_weekly_schedule(schedule_id),
+    schedule_id  UUID REFERENCES trainer_weekly_schedule(schedule_id) ON DELETE CASCADE,
     trainer_id   UUID REFERENCES trainers(trainer_id),
     facility_id  UUID REFERENCES facilities(facility_id),
     date         DATE NOT NULL,
@@ -35,5 +35,15 @@ CREATE TABLE trainer_sessions (
     updated_at   TIMESTAMP DEFAULT NOW(),
     UNIQUE (schedule_id, date)  -- prevents duplicates by cron
 );
+
+CREATE TABLE training_session_register(
+    register_id UUID PRIMARY KEY, 
+    session_id UUID REFERENCES trainer_sessions(session_id),
+    user_id UUID REFERENCES users(user_id),
+    UNIQUE(session_id, user_id) --user can register for session just 1 time
+
+)
+
+--this table will stote bookings that made for the training schedule
 
 

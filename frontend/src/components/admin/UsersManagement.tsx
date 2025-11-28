@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { userService } from '../../api/user';
 import { facilityApi } from '../../api/facility';
+import { adminApi } from '../../api/admin';
 import { User, Booking, Facility } from '../../types';
 import { format } from 'date-fns';
-import { Search, ChevronLeft, ChevronRight, X, Calendar, Clock, MapPin } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, X, Calendar, Clock, MapPin, Award, Loader2 } from 'lucide-react';
 
 const UsersManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -15,6 +16,7 @@ const UsersManagement: React.FC = () => {
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [facilities, setFacilities] = useState<Record<string, string>>({});
+  const [promotingId, setPromotingId] = useState<string | null>(null);
   const LIMIT = 10; // Assuming backend default limit
 
   useEffect(() => {
@@ -95,6 +97,24 @@ const UsersManagement: React.FC = () => {
     // keyword state is already updated via onChange, useEffect triggers loadUsers
   };
 
+  const handlePromoteToTrainer = async (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!confirm('Are you sure you want to promote this user to trainer?')) {
+      return;
+    }
+
+    try {
+      setPromotingId(userId);
+      await adminApi.promoteToTrainer(userId);
+      await loadUsers(); // Reload to show updated role
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to promote user to trainer');
+    } finally {
+      setPromotingId(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -143,15 +163,38 @@ const UsersManagement: React.FC = () => {
                       <div className="text-sm text-gray-900">{user.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                        {user.role}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                          user.role === 'trainer' ? 'bg-green-100 text-green-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                          {user.role}
+                        </span>
+                        {user.role === 'trainer' && (
+                          <Award className="w-4 h-4 text-green-600" />
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{format(new Date(user.created_at), 'MMM d, yyyy')}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      {user.role !== 'trainer' && user.role !== 'admin' && (
+                        <button
+                          onClick={(e) => handlePromoteToTrainer(user.id, e)}
+                          disabled={promotingId === user.id}
+                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                        >
+                          {promotingId === user.id ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Promoting...
+                            </span>
+                          ) : (
+                            'Promote to Trainer'
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

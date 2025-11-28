@@ -9,6 +9,7 @@ import Facilities from './pages/Facilities';
 import FacilitySchedule from './pages/FacilitySchedule';
 import Admin from './pages/Admin';
 import MyBookings from './pages/MyBookings';
+import TrainerDashboard from './pages/TrainerDashboard';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             <Route path="facility/:id" element={<FacilitySchedule />} />
             <Route path="bookings" element={<MyBookings />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="trainer" element={<TrainerDashboard />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -10,12 +10,45 @@ export interface User {
   first_name: string;
   last_name: string;
   email: string;
-  role: 'student' | 'staff' | 'admin';
+  role: 'student' | 'staff' | 'admin' | 'trainer';
   phone?: string;
   credit_score?: number;
   is_active?: boolean;
+  is_trainer?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Trainer {
+  id: string;
+  bio: string;
+  specialty: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateTrainerRequest {
+  bio: string;
+  specialty: string;
+}
+
+export interface WeeklySchedule {
+  id: string;
+  trainer_id: string;
+  facility_id: string;
+  weekday: number; // 0-6 (Sunday-Saturday)
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  is_active: boolean;
+}
+
+export interface CreateScheduleRequest {
+  facility_id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  capacity: number;
 }
 
 export interface LoginRequest {

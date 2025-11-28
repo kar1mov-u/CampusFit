@@ -14,7 +14,7 @@ import {
 import { cn } from '../lib/utils';
 
 const Layout: React.FC = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isTrainer } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -25,8 +25,9 @@ const Layout: React.FC = () => {
   };
 
   const navItems = [
-    ...(!isAdmin ? [{ path: '/', label: 'Facilities', icon: Dumbbell }] : []),
-    ...(!isAdmin ? [{ path: '/bookings', label: 'My Bookings', icon: Calendar }] : []),
+    ...(!isAdmin && !isTrainer ? [{ path: '/', label: 'Facilities', icon: Dumbbell }] : []),
+    ...(!isAdmin && !isTrainer ? [{ path: '/bookings', label: 'My Bookings', icon: Calendar }] : []),
+    ...(isTrainer ? [{ path: '/trainer', label: 'Trainer Dashboard', icon: User }] : []),
     ...(isAdmin ? [{ path: '/admin', label: 'Admin Panel', icon: LayoutDashboard }] : []),
   ];
 

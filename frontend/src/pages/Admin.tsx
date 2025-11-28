@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import FacilitiesManagement from '../components/admin/FacilitiesManagement';
 import UsersManagement from '../components/admin/UsersManagement';
 import BookingsManagement from '../components/admin/BookingsManagement';
+import TrainerManagement from '../components/admin/TrainerManagement';
 
-type TabType = 'facilities' | 'users' | 'bookings';
+type TabType = 'facilities' | 'users' | 'bookings' | 'trainers';
 
 const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('facilities');
@@ -41,7 +42,7 @@ const Admin: React.FC = () => {
             ← Back to facilities
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Admin Panel</h1>
-          <p className="text-gray-600 mt-2">Welcome, {user?.name}</p>
+          <p className="text-gray-600 mt-2">Welcome, {user?.first_name} {user?.last_name}</p>
         </div>
 
         {/* Tabs */}
@@ -50,33 +51,39 @@ const Admin: React.FC = () => {
             <nav className="flex -mb-px">
               <button
                 onClick={() => setActiveTab('facilities')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'facilities'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'facilities'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 Facilities
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'users'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'users'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 Users
               </button>
               <button
                 onClick={() => setActiveTab('bookings')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'bookings'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bookings'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 Bookings
+              </button>
+              <button
+                onClick={() => setActiveTab('trainers')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'trainers'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                Trainers
               </button>
             </nav>
           </div>
@@ -86,6 +93,7 @@ const Admin: React.FC = () => {
             {activeTab === 'facilities' && <FacilitiesManagement />}
             {activeTab === 'users' && <UsersManagement />}
             {activeTab === 'bookings' && <BookingsManagement />}
+            {activeTab === 'trainers' && <TrainerManagement />}
           </div>
         </div>
       </div>
