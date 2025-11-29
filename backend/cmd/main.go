@@ -9,6 +9,8 @@ import (
 	"t/internal/config"
 	"t/internal/facility"
 	"t/internal/review"
+	"t/internal/schedule"
+	"t/internal/session"
 	"t/internal/trainer"
 	"t/internal/transport/http"
 	"t/internal/user"
@@ -50,7 +52,15 @@ func main() {
 	trainerRep := trainer.NewTrainerRepositoryPostgres(pGpool)
 	trainerSrv := trainer.NewTrainerService(trainerRep)
 
-	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv, trainerSrv)
+	//create session
+	sessionRep := session.NewSessionRepositoryPostgres(pGpool)
+	sessionSrv := session.NewSessionService(sessionRep)
+
+	//create schedule
+	scheduleRep := schedule.NewScheduleRepositoryPostgres(pGpool)
+	scheduleSrv := schedule.NewScheduleService(scheduleRep)
+
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv, trainerSrv, sessionSrv, scheduleSrv)
 
 	srv.Start()
 

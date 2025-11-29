@@ -7,6 +7,8 @@ import (
 	"t/internal/booking"
 	"t/internal/facility"
 	"t/internal/review"
+	"t/internal/schedule"
+	"t/internal/session"
 	"t/internal/trainer"
 	"t/internal/user"
 
@@ -26,11 +28,13 @@ type Server struct {
 	bookingService  *booking.BookingService
 	reviewService   *review.ReviewService
 	trainerService  *trainer.TrainerService
+	sessionService  *session.SessionService
+	scheduleService *schedule.ScheduleService
 	validator       *validator.Validate
 	logger          *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService, sessionSrv *session.SessionService, scheduleSrv *schedule.ScheduleService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -50,6 +54,8 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 		bookingService:  bookSrv,
 		reviewService:   reviewSrv,
 		trainerService:  trainerSrv,
+		sessionService:  sessionSrv,
+		scheduleService: scheduleSrv,
 		authService:     authSrv,
 		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
@@ -116,6 +122,19 @@ func (s *Server) registerHandlers() {
 			pro.Get("/trainers/{id}", s.GetTrainerHandler)
 			pro.Patch("/trainers/{id}", s.UpdateTrainerHandler)
 			pro.Delete("/trainers/{id}", s.DeleteTrainerHandler)
+
+			// Schedule endpoints
+			pro.Post("/schedules", s.CreateScheduleHandler)
+			pro.Delete("/schedules/{id}", s.DeleteScheduleHandler)
+			pro.Get("/schedules/trainer/{trainer_id}", s.ListTrainerSchedulesHandler)
+			pro.Get("/schedules/facility/{facility_id}", s.ListFacilitySchedulesHandler)
+
+			// Session endpoints
+			pro.Post("/sessions", s.CreateSessionHandler)
+			pro.Delete("/sessions/{id}", s.DeleteSessionHandler)
+			pro.Post("/sessions/cancel/{id}", s.CancelSessionHandler)
+			pro.Get("/sessions/facility/{facility_id}", s.ListFacilitySessionsHandler)
+			pro.Get("/sessions/trainer/{trainer_id}", s.ListTrainerSessionsHandler)
 		})
 
 	})

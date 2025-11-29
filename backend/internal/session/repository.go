@@ -21,6 +21,12 @@ type SessionRepositoryPostgres struct {
 	pool *pgxpool.Pool
 }
 
+func NewSessionRepositoryPostgres(p *pgxpool.Pool) *SessionRepositoryPostgres {
+	return &SessionRepositoryPostgres{
+		pool: p,
+	}
+}
+
 func (r *SessionRepositoryPostgres) CreateSession(ctx context.Context, data Session) error {
 	query := `INSERT INTO trainer_sessions (session_id, schedule_id, trainer_id, facility_id, date, start_time, end_time, capacity, is_canceled) VALUES ($1, $2,$3,$4,$5,$6,$7,$8,$9)`
 

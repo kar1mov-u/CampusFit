@@ -39,9 +39,9 @@ func (r *TrainerRepositoryPostgres) CreateTrainer(ctx context.Context, userID uu
 		return fmt.Errorf("CreateTrainer: failed to Exec: %w", err)
 	}
 
-	query = `INSERT INTO trainers (trainer_id) VALUES($1)`
+	query = `INSERT INTO trainers (trainer_id, bio, specialty) VALUES($1, $2, $3)`
 
-	_, err = tx.Exec(ctx, query, userID)
+	_, err = tx.Exec(ctx, query, userID, "", "")
 	if err != nil {
 		return fmt.Errorf("CraeteTrainer: failed to Exec: %w", err)
 	}

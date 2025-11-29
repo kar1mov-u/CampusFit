@@ -47,7 +47,7 @@ func (r *ScheduleRepositoryPostgres) CreateTrainingScehdule(ctx context.Context,
 		return fmt.Errorf("Trainer cannot have overlapping trainings")
 	}
 
-	query = `INSERT INTO trainer_weekly_schedule ( schedule_id,trainer_id, facility_id, weekday, start_time, end_time, capacity) VALUES ($1, $2, $3, $4, $5, $6. $7)`
+	query = `INSERT INTO trainer_weekly_schedule ( schedule_id,trainer_id, facility_id, weekday, start_time, end_time, capacity) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	_, err = tx.Exec(ctx, query, data.ID, data.TrainerID, data.FacilityID, data.WeekDay, data.StartTime, data.EndTime, data.Capacity)
 	if err != nil {
