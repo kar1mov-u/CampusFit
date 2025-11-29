@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import TrainerProfile from '../components/trainer/TrainerProfile';
 import WeeklyScheduleBuilder from '../components/trainer/WeeklyScheduleBuilder';
+import TrainerSessions from '../components/trainer/TrainerSessions';
 
 type TabType = 'profile' | 'schedule' | 'sessions';
 
@@ -48,8 +49,8 @@ const TrainerDashboard: React.FC = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${isActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                                     }`}
                             >
                                 <Icon className="w-5 h-5" />
@@ -70,15 +71,7 @@ const TrainerDashboard: React.FC = () => {
             >
                 {activeTab === 'profile' && <TrainerProfile />}
                 {activeTab === 'schedule' && <WeeklyScheduleBuilder />}
-                {activeTab === 'sessions' && (
-                    <div className="glass-card p-12 text-center">
-                        <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-xl font-semibold mb-2">Sessions Coming Soon</h3>
-                        <p className="text-muted-foreground">
-                            View and manage your upcoming training sessions here.
-                        </p>
-                    </div>
-                )}
+                {activeTab === 'sessions' && <TrainerSessions />}
             </motion.div>
         </div>
     );

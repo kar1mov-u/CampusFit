@@ -7,4 +7,10 @@ export const sessionApi = {
         const response = await api.get<ApiResponse<Session[]>>(`/sessions/facility/${facilityId}?date=${date}`);
         return response.data;
     },
+
+    // List sessions for a trainer on a specific date
+    listTrainerSessions: async (trainerId: string, date: string) => {
+        const response = await api.get<ApiResponse<Session[]>>(`/sessions/trainer/${trainerId}?date=${date}`);
+        return response.data;
+    },
 };

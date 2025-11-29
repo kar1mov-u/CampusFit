@@ -23,6 +23,14 @@ export interface Trainer {
   id: string;
   bio: string;
   specialty: string;
+  specialization?: string; // Alias for specialty to match UI usage
+  user: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  profile_picture_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -151,4 +159,20 @@ export interface Session {
   is_canceled: boolean;
   created_at: string;
   updated_at: string;
+  registered_count: number;
+}
+
+export interface Registration {
+  id: string;
+  session_id: string;
+  user_id: string;
+  is_canceled: boolean;
+  created_at: string;
+  updated_at: string;
+  user?: User;
+  session?: Session;
+}
+
+export interface CreateRegistrationRequest {
+  session_id: string;
 }

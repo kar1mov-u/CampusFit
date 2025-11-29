@@ -4,12 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
+  LayoutGrid,
   Calendar,
   LogOut,
   User,
   Menu,
   X,
-  Dumbbell
+  Dumbbell,
+  Users
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -25,10 +27,13 @@ const Layout: React.FC = () => {
   };
 
   const navItems = [
-    ...(!isAdmin && !isTrainer ? [{ path: '/', label: 'Facilities', icon: Dumbbell }] : []),
-    ...(!isAdmin && !isTrainer ? [{ path: '/bookings', label: 'My Bookings', icon: Calendar }] : []),
-    ...(isTrainer ? [{ path: '/trainer', label: 'Trainer Dashboard', icon: User }] : []),
-    ...(isAdmin ? [{ path: '/admin', label: 'Admin Panel', icon: LayoutDashboard }] : []),
+    ...(!isAdmin && !isTrainer ? [
+      { name: 'Facilities', href: '/facilities', icon: LayoutGrid },
+      { name: 'Trainers', href: '/trainers', icon: Users },
+      { name: 'My Bookings', href: '/bookings', icon: Calendar },
+    ] : []),
+    ...(isTrainer ? [{ name: 'Trainer Dashboard', href: '/trainer/dashboard', icon: User }] : []),
+    ...(isAdmin ? [{ name: 'Admin Panel', href: '/admin', icon: LayoutDashboard }] : []),
   ];
 
   return (
@@ -84,12 +89,12 @@ const Layout: React.FC = () => {
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname === item.href;
               return (
                 <button
-                  key={item.path}
+                  key={item.href}
                   onClick={() => {
-                    navigate(item.path);
+                    navigate(item.href);
                     setIsSidebarOpen(false);
                   }}
                   className={cn(
@@ -100,7 +105,7 @@ const Layout: React.FC = () => {
                   )}
                 >
                   <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium">{item.name}</span>
                 </button>
               );
             })}

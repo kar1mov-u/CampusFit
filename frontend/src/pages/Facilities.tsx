@@ -139,7 +139,7 @@ const Facilities: React.FC = () => {
               key={facility.id}
               variants={item}
               whileHover={{ y: -5 }}
-              onClick={() => navigate(`/facility/${facility.id}`)}
+              onClick={() => navigate(`/facilities/${facility.id}`)}
               className="group bg-card rounded-xl border border-border overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <div className="relative h-48 bg-gradient-to-br from-primary/10 to-purple-500/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-500">

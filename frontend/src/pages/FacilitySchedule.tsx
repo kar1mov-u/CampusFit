@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { facilityApi } from '../api/facility';
 import { bookingApi } from '../api/booking';
 import { sessionApi } from '../api/session';
-import { Facility, Booking, Session } from '../types';
+import { registrationApi } from '../api/registration';
+import { Facility, Booking, Session, Registration } from '../types';
 import { format, addDays, isSameDay, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,10 +31,13 @@ const FacilitySchedule: React.FC = () => {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Monday
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<number[]>([]);
   const [bookingNote, setBookingNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -63,9 +67,10 @@ const FacilitySchedule: React.FC = () => {
           sessionApi.listFacilitySessions(id!, format(day, 'yyyy-MM-dd'))
         );
 
-        const [allBookingsResults, allSessionsResults] = await Promise.all([
+        const [allBookingsResults, allSessionsResults, userRegistrations] = await Promise.all([
           Promise.all(allBookingsPromises),
-          Promise.all(allSessionsPromises)
+          Promise.all(allSessionsPromises),
+          user ? registrationApi.listUserRegistrations(user.id) : Promise.resolve({ data: [] })
         ]);
 
         const allBookings = allBookingsResults.flatMap(result => result.data);
@@ -73,10 +78,14 @@ const FacilitySchedule: React.FC = () => {
 
         setBookings(allBookings);
         setSessions(allSessions);
+        if (userRegistrations.data) {
+          setRegistrations(userRegistrations.data);
+        }
       } catch (bookingErr) {
         console.log('Bookings/Sessions endpoint error', bookingErr);
         setBookings([]);
         setSessions([]);
+        setRegistrations([]);
       }
     } catch (err) {
       console.error('Failed to load facility data', err);
@@ -101,14 +110,18 @@ const FacilitySchedule: React.FC = () => {
     return slots;
   };
 
-  const getSlotStatus = (hour: number, date: Date): 'available' | 'booked' | 'my-booking' | 'session' => {
+  const getSlotStatus = (hour: number, date: Date): 'available' | 'booked' | 'my-booking' | 'session' | 'my-session' => {
     // Check for sessions first
     const session = sessions.find((s) => {
       const startHour = parseInt(s.start_time.split(':')[0]);
       const endHour = parseInt(s.end_time.split(':')[0]);
       return hour >= startHour && hour < endHour && !s.is_canceled && isSameDay(new Date(s.date), date);
     });
-    if (session) return 'session';
+
+    if (session) {
+      const isRegistered = registrations.some(r => r.session_id === session.id && !r.is_canceled);
+      return isRegistered ? 'my-session' : 'session';
+    }
 
     const booking = bookings.find((b) => {
       const startHour = parseInt(b.start_time.split(':')[0]);
@@ -135,6 +148,19 @@ const FacilitySchedule: React.FC = () => {
 
     // Set the selected date when clicking a slot
     setSelectedDate(date);
+
+    // Check if it's a session
+    const session = sessions.find((s) => {
+      const startHour = parseInt(s.start_time.split(':')[0]);
+      const endHour = parseInt(s.end_time.split(':')[0]);
+      return hour >= startHour && hour < endHour && !s.is_canceled && isSameDay(new Date(s.date), date);
+    });
+
+    if (session) {
+      setSelectedSession(session);
+      setShowSessionModal(true);
+      return;
+    }
 
     const status = getSlotStatus(hour, date);
     if (status !== 'available') return;
@@ -205,6 +231,26 @@ const FacilitySchedule: React.FC = () => {
       loadData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create booking');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSessionRegistration = async () => {
+    if (!selectedSession || !user) return;
+
+    try {
+      setSubmitting(true);
+      await registrationApi.create({
+        session_id: selectedSession.id
+      });
+
+      setShowSessionModal(false);
+      setSelectedSession(null);
+      loadData();
+      alert('Successfully registered for session!');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to register for session');
     } finally {
       setSubmitting(false);
     }
@@ -378,13 +424,7 @@ const FacilitySchedule: React.FC = () => {
                 key={slot.time}
                 whileHover={status === 'available' && !isPastSlot ? { scale: 1.02 } : {}}
                 whileTap={status === 'available' && !isPastSlot ? { scale: 0.98 } : {}}
-                onClick={() => {
-                  if (status === 'session') {
-                    alert('Registration for sessions coming soon!');
-                    return;
-                  }
-                  handleSlotClick(slot.hour, selectedDate);
-                }}
+                onClick={() => handleSlotClick(slot.hour, selectedDate)}
                 disabled={(status !== 'available' && status !== 'session') || isPastSlot}
                 className={cn(
                   "p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
@@ -392,7 +432,8 @@ const FacilitySchedule: React.FC = () => {
                   status === 'available' && !selected && isPastSlot && "bg-card opacity-50 cursor-not-allowed",
                   selected && "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20",
                   status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default",
-                  status === 'session' && "bg-purple-500/10 text-purple-600 border-purple-500/20 cursor-pointer hover:bg-purple-500/20"
+                  status === 'session' && "bg-purple-500/10 text-purple-600 border-purple-500/20 cursor-pointer hover:bg-purple-500/20",
+                  status === 'my-session' && "bg-green-500/10 text-green-600 border-green-500/20 cursor-default"
                 )}
               >
                 <div className="text-lg font-bold">{slot.time}</div>
@@ -400,10 +441,24 @@ const FacilitySchedule: React.FC = () => {
                   {selected && <Check className="w-3 h-3" />}
                   {status === 'my-booking' && <Users className="w-3 h-3" />}
                   {status === 'session' && <Users className="w-3 h-3" />}
+                  {status === 'my-session' && <Check className="w-3 h-3" />}
                   {status === 'available' && !selected && 'Available'}
                   {selected && 'Selected'}
                   {status === 'my-booking' && 'Your Booking'}
                   {status === 'session' && 'Training Session'}
+                  {status === 'my-session' && 'Registered'}
+                  {(status === 'session' || status === 'my-session') && (() => {
+                    const session = sessions.find(s => {
+                      const startHour = parseInt(s.start_time.split(':')[0]);
+                      const endHour = parseInt(s.end_time.split(':')[0]);
+                      return slot.hour >= startHour && slot.hour < endHour && !s.is_canceled && isSameDay(new Date(s.date), selectedDate);
+                    });
+                    if (session) {
+                      const spotsLeft = session.capacity - (session.registered_count || 0);
+                      return <div className="text-[10px] opacity-80">{spotsLeft} spots left</div>;
+                    }
+                    return null;
+                  })()}
                 </div>
               </motion.button>
             );
@@ -509,6 +564,72 @@ const FacilitySchedule: React.FC = () => {
                       <>
                         <Check className="w-4 h-4" />
                         Confirm
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Session Registration Modal */}
+      <AnimatePresence>
+        {showSessionModal && selectedSession && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border overflow-hidden"
+            >
+              <div className="p-6 space-y-6">
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold">Register for Session</h3>
+                  <p className="text-muted-foreground mt-1">Join this training session</p>
+                </div>
+
+                <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="font-medium">{format(new Date(selectedSession.date), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Time</span>
+                    <span className="font-medium">
+                      {selectedSession.start_time} - {selectedSession.end_time}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Availability</span>
+                    <span className="font-medium">
+                      {selectedSession.capacity - (selectedSession.registered_count || 0)} / {selectedSession.capacity} spots left
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowSessionModal(false);
+                      setSelectedSession(null);
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-input hover:bg-muted transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSessionRegistration}
+                    disabled={submitting}
+                    className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Register
                       </>
                     )}
                   </button>
