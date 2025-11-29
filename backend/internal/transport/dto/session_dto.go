@@ -44,31 +44,33 @@ func (req *CreateSessionRequest) ToDomain() (*session.Session, error) {
 }
 
 type SessionResponse struct {
-	ID         uuid.UUID `json:"id"`
-	ScheduleID uuid.UUID `json:"schedule_id"`
-	TrainerID  uuid.UUID `json:"trainer_id"`
-	FacilityID uuid.UUID `json:"facility_id"`
-	Date       string    `json:"date"`
-	StartTime  string    `json:"start_time"`
-	EndTime    string    `json:"end_time"`
-	Capacity   int       `json:"capacity"`
-	IsCanceled bool      `json:"is_canceled"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	ScheduleID      uuid.UUID `json:"schedule_id"`
+	TrainerID       uuid.UUID `json:"trainer_id"`
+	FacilityID      uuid.UUID `json:"facility_id"`
+	Date            string    `json:"date"`
+	StartTime       string    `json:"start_time"`
+	EndTime         string    `json:"end_time"`
+	Capacity        int       `json:"capacity"`
+	IsCanceled      bool      `json:"is_canceled"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	RegisteredCount int       `json:"registered_count"`
 }
 
 func NewSessionResponse(s session.Session) SessionResponse {
 	return SessionResponse{
-		ID:         s.ID,
-		ScheduleID: s.ScheduleID,
-		TrainerID:  s.TrainerID,
-		FacilityID: s.FacilityID,
-		Date:       s.Date.Format("2006-01-02"),
-		StartTime:  s.StartTime.Format("15:04"),
-		EndTime:    s.EndTime.Format("15:04"),
-		Capacity:   s.Capacity,
-		IsCanceled: s.IsCanceled,
-		CreatedAt:  s.CreatedAt,
-		UpdatedAt:  s.UpdatedAt,
+		ID:              s.ID,
+		ScheduleID:      s.ScheduleID,
+		TrainerID:       s.TrainerID,
+		FacilityID:      s.FacilityID,
+		Date:            s.Date.Format("2006-01-02"),
+		StartTime:       s.StartTime.Format("15:04"),
+		EndTime:         s.EndTime.Format("15:04"),
+		Capacity:        s.Capacity,
+		IsCanceled:      s.IsCanceled,
+		CreatedAt:       s.CreatedAt,
+		UpdatedAt:       s.UpdatedAt,
+		RegisteredCount: s.RegisteredCount,
 	}
 }

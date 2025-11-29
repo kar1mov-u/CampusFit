@@ -71,7 +71,7 @@ func NextWeekdays(weekday int, count int) []time.Time {
 	results := make([]time.Time, 0, count)
 
 	// Convert int → time.Weekday
-	target := time.Weekday((weekday + 1) % 7) // because Go uses 0=Sunday, 1=Monday
+	target := time.Weekday((weekday) % 7) // because Go uses 0=Sunday, 1=Monday
 
 	// current weekday relative to Go's system
 	currentWeekday := now.Weekday()

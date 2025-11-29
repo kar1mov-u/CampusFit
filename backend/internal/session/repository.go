@@ -58,8 +58,9 @@ func (r *SessionRepositoryPostgres) CancelSession(ctx context.Context, id uuid.U
 }
 
 func (r *SessionRepositoryPostgres) ListFacilitySessions(ctx context.Context, facilityID uuid.UUID, date time.Time) ([]Session, error) {
-	query := `SELECT session_id, schedule_id, trainer_id, facility_id, date, start_time, end_time, capacity, is_canceled 
-			  FROM trainer_sessions WHERE facility_id=$1 AND date=$2 ORDER BY start_time`
+	query := `SELECT ts.session_id, ts.schedule_id, ts.trainer_id, ts.facility_id, ts.date, ts.start_time, ts.end_time, ts.capacity, ts.is_canceled,
+			  (SELECT COUNT(*) FROM training_session_register r WHERE r.session_id = ts.session_id AND r.is_canceled = FALSE) as registered_count
+			  FROM trainer_sessions ts WHERE ts.facility_id=$1 AND ts.date=$2 ORDER BY ts.start_time`
 
 	rows, err := r.pool.Query(ctx, query, facilityID, date)
 	if err != nil {
@@ -70,7 +71,7 @@ func (r *SessionRepositoryPostgres) ListFacilitySessions(ctx context.Context, fa
 	var sessions []Session
 	for rows.Next() {
 		var s Session
-		err := rows.Scan(&s.ID, &s.ScheduleID, &s.TrainerID, &s.FacilityID, &s.Date, &s.StartTime, &s.EndTime, &s.Capacity, &s.IsCanceled)
+		err := rows.Scan(&s.ID, &s.ScheduleID, &s.TrainerID, &s.FacilityID, &s.Date, &s.StartTime, &s.EndTime, &s.Capacity, &s.IsCanceled, &s.RegisteredCount)
 		if err != nil {
 			return nil, fmt.Errorf("ListFacilitySessions: Failed to scan: %w", err)
 		}
@@ -80,8 +81,9 @@ func (r *SessionRepositoryPostgres) ListFacilitySessions(ctx context.Context, fa
 }
 
 func (r *SessionRepositoryPostgres) ListTrainerSessions(ctx context.Context, trainerID uuid.UUID, date time.Time) ([]Session, error) {
-	query := `SELECT session_id, schedule_id, trainer_id, facility_id, date, start_time, end_time, capacity, is_canceled 
-			  FROM trainer_sessions WHERE trainer_id=$1 AND date=$2 ORDER BY start_time`
+	query := `SELECT ts.session_id, ts.schedule_id, ts.trainer_id, ts.facility_id, ts.date, ts.start_time, ts.end_time, ts.capacity, ts.is_canceled,
+			  (SELECT COUNT(*) FROM training_session_register r WHERE r.session_id = ts.session_id AND r.is_canceled = FALSE) as registered_count
+			  FROM trainer_sessions ts WHERE ts.trainer_id=$1 AND ts.date=$2 ORDER BY ts.start_time`
 
 	rows, err := r.pool.Query(ctx, query, trainerID, date)
 	if err != nil {
@@ -92,7 +94,7 @@ func (r *SessionRepositoryPostgres) ListTrainerSessions(ctx context.Context, tra
 	var sessions []Session
 	for rows.Next() {
 		var s Session
-		err := rows.Scan(&s.ID, &s.ScheduleID, &s.TrainerID, &s.FacilityID, &s.Date, &s.StartTime, &s.EndTime, &s.Capacity, &s.IsCanceled)
+		err := rows.Scan(&s.ID, &s.ScheduleID, &s.TrainerID, &s.FacilityID, &s.Date, &s.StartTime, &s.EndTime, &s.Capacity, &s.IsCanceled, &s.RegisteredCount)
 		if err != nil {
 			return nil, fmt.Errorf("ListTrainerSessions: Failed to scan: %w", err)
 		}

@@ -40,10 +40,13 @@ CREATE TABLE training_session_register(
     register_id UUID PRIMARY KEY, 
     session_id UUID REFERENCES trainer_sessions(session_id),
     user_id UUID REFERENCES users(user_id),
+    is_canceled BOOLEAN DEFAULT FALSE,
+    created_at   TIMESTAMP DEFAULT NOW(),
+    updated_at   TIMESTAMP DEFAULT NOW(),
     UNIQUE(session_id, user_id) --user can register for session just 1 time
 
 )
 
---this table will stote bookings that made for the training schedule
+
 
 

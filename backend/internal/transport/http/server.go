@@ -6,6 +6,7 @@ import (
 	"t/internal/auth"
 	"t/internal/booking"
 	"t/internal/facility"
+	"t/internal/registration"
 	"t/internal/review"
 	"t/internal/schedule"
 	"t/internal/session"
@@ -20,21 +21,22 @@ import (
 )
 
 type Server struct {
-	router          *chi.Mux
-	httpServer      *http.Server
-	userService     *user.UserService
-	authService     *auth.AuthService
-	facilityService *facility.FacilityService
-	bookingService  *booking.BookingService
-	reviewService   *review.ReviewService
-	trainerService  *trainer.TrainerService
-	sessionService  *session.SessionService
-	scheduleService *schedule.ScheduleService
-	validator       *validator.Validate
-	logger          *zap.Logger
+	router              *chi.Mux
+	httpServer          *http.Server
+	userService         *user.UserService
+	authService         *auth.AuthService
+	facilityService     *facility.FacilityService
+	bookingService      *booking.BookingService
+	reviewService       *review.ReviewService
+	trainerService      *trainer.TrainerService
+	sessionService      *session.SessionService
+	scheduleService     *schedule.ScheduleService
+	registrationService *registration.RegistrationService
+	validator           *validator.Validate
+	logger              *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService, sessionSrv *session.SessionService, scheduleSrv *schedule.ScheduleService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService, sessionSrv *session.SessionService, scheduleSrv *schedule.ScheduleService, registrationSrv *registration.RegistrationService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -47,17 +49,18 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 			Addr:    addr,
 			Handler: router, // here httpServer uses router to route the incoming request
 		},
-		logger:          logger,
-		facilityService: facilSrv,
-		validator:       validator,
-		userService:     userSrv,
-		bookingService:  bookSrv,
-		reviewService:   reviewSrv,
-		trainerService:  trainerSrv,
-		sessionService:  sessionSrv,
-		scheduleService: scheduleSrv,
-		authService:     authSrv,
-		router:          router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
+		logger:              logger,
+		facilityService:     facilSrv,
+		validator:           validator,
+		userService:         userSrv,
+		bookingService:      bookSrv,
+		reviewService:       reviewSrv,
+		trainerService:      trainerSrv,
+		sessionService:      sessionSrv,
+		scheduleService:     scheduleSrv,
+		registrationService: registrationSrv,
+		authService:         authSrv,
+		router:              router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
 
 	s.registerHandlers()
@@ -135,6 +138,12 @@ func (s *Server) registerHandlers() {
 			pro.Post("/sessions/cancel/{id}", s.CancelSessionHandler)
 			pro.Get("/sessions/facility/{facility_id}", s.ListFacilitySessionsHandler)
 			pro.Get("/sessions/trainer/{trainer_id}", s.ListTrainerSessionsHandler)
+
+			// Registration endpoints
+			pro.Post("/registrations", s.CreateRegistrationHandler)
+			pro.Post("/registrations/cancel/{id}", s.CancelRegistrationHandler)
+			pro.Get("/registrations/session/{session_id}", s.ListSessionRegistrationsHandler)
+			pro.Get("/registrations/user/{user_id}", s.ListUserRegistrationsHandler)
 		})
 
 	})

@@ -85,18 +85,33 @@ func (r *TrainerRepositoryPostgres) DeleteTrainer(ctx context.Context, id uuid.U
 }
 
 func (r *TrainerRepositoryPostgres) GetTrainer(ctx context.Context, id uuid.UUID) (Trainer, error) {
-	query := `SELECT trainer_id, bio, specialty, created_at, updated_at FROM trainers WHERE trainer_id=$1`
+	query := `
+		SELECT 
+			t.trainer_id, t.bio, t.specialty, t.created_at, t.updated_at,
+			u.user_id, u.first_name, u.last_name, u.email, u.role, u.created_at, u.updated_at
+		FROM trainers t
+		JOIN users u ON t.trainer_id = u.user_id
+		WHERE t.trainer_id=$1`
 
 	var t Trainer
-	err := r.pool.QueryRow(ctx, query, id).Scan(&t.ID, &t.Bio, &t.Specialty, &t.CreatedAt, &t.UpdatedAt)
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&t.ID, &t.Bio, &t.Specialty, &t.CreatedAt, &t.UpdatedAt,
+		&t.User.ID, &t.User.FirstName, &t.User.LastName, &t.User.Email, &t.User.Role, &t.User.CreatedAt, &t.User.UpdatedAt,
+	)
 	if err != nil {
-		return Trainer{}, fmt.Errorf("GetTrainer: Failed to Qeury: %w", err)
+		return Trainer{}, fmt.Errorf("GetTrainer: Failed to Query: %w", err)
 	}
 	return t, nil
 }
 
 func (r *TrainerRepositoryPostgres) ListTrainers(ctx context.Context, offset int) ([]Trainer, error) {
-	query := `SELECT trainer_id, bio, specialty, created_at, updated_at FROM trainers ORDER BY created_at DESC OFFSET $1 LIMIT 10`
+	query := `
+		SELECT 
+			t.trainer_id, t.bio, t.specialty, t.created_at, t.updated_at,
+			u.user_id, u.first_name, u.last_name, u.email, u.role, u.created_at, u.updated_at
+		FROM trainers t
+		JOIN users u ON t.trainer_id = u.user_id
+		ORDER BY t.created_at DESC OFFSET $1 LIMIT 10`
 
 	rows, err := r.pool.Query(ctx, query, offset)
 	if err != nil {
@@ -107,8 +122,10 @@ func (r *TrainerRepositoryPostgres) ListTrainers(ctx context.Context, offset int
 	resp := make([]Trainer, 0)
 	for rows.Next() {
 		var t Trainer
-
-		err := rows.Scan(&t.ID, &t.Bio, &t.Specialty, &t.CreatedAt, &t.UpdatedAt)
+		err := rows.Scan(
+			&t.ID, &t.Bio, &t.Specialty, &t.CreatedAt, &t.UpdatedAt,
+			&t.User.ID, &t.User.FirstName, &t.User.LastName, &t.User.Email, &t.User.Role, &t.User.CreatedAt, &t.User.UpdatedAt,
+		)
 		if err != nil {
 			return []Trainer{}, fmt.Errorf("ListTrainers: Failed to Scan: %w", err)
 		}
