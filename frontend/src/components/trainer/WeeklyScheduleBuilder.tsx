@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Plus, Trash2, Loader2, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { facilityApi } from '../../api/facility';
+import { trainerApi } from '../../api/trainer';
 import { Facility, CreateScheduleRequest } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -17,10 +19,12 @@ interface ScheduleSlot {
 }
 
 const WeeklyScheduleBuilder: React.FC = () => {
+    const { user } = useAuth();
     const [facilities, setFacilities] = useState<Facility[]>([]);
     const [schedules, setSchedules] = useState<ScheduleSlot[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const [formData, setFormData] = useState<CreateScheduleRequest>({
         facility_id: '',
@@ -31,49 +35,81 @@ const WeeklyScheduleBuilder: React.FC = () => {
     });
 
     useEffect(() => {
-        loadFacilities();
-    }, []);
+        if (user?.id) {
+            loadData();
+        }
+    }, [user?.id]);
 
-    const loadFacilities = async () => {
+    const loadData = async () => {
         try {
             setLoading(true);
-            const response = await facilityApi.getAll();
-            setFacilities(response.data);
+            const [facilitiesRes, schedulesRes] = await Promise.all([
+                facilityApi.getAll(),
+                trainerApi.getWeeklySchedules(user!.id)
+            ]);
+
+            setFacilities(facilitiesRes.data);
+
+            // Map backend schedules to UI format
+            const mappedSchedules = schedulesRes.data.map((s: any) => {
+                const facility = facilitiesRes.data.find(f => f.id === s.facility_id);
+                return {
+                    id: s.id,
+                    weekday: s.weekday,
+                    start_time: s.start_time,
+                    end_time: s.end_time,
+                    facility_id: s.facility_id,
+                    facility_name: facility?.name || 'Unknown Facility',
+                    capacity: s.capacity
+                };
+            });
+            setSchedules(mappedSchedules);
         } catch (err) {
-            console.error('Failed to load facilities:', err);
+            console.error('Failed to load data:', err);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddSchedule = () => {
+    const handleAddSchedule = async () => {
         if (!formData.facility_id) {
             alert('Please select a facility');
             return;
         }
 
-        const facility = facilities.find(f => f.id === formData.facility_id);
-        const newSchedule: ScheduleSlot = {
-            id: `temp-${Date.now()}`,
-            ...formData,
-            facility_name: facility?.name || 'Unknown',
-        };
+        try {
+            setSubmitting(true);
+            await trainerApi.createWeeklySchedule(formData);
 
-        setSchedules([...schedules, newSchedule]);
-        setShowAddForm(false);
+            // Reload data to get the new schedule with ID
+            await loadData();
 
-        // Reset form
-        setFormData({
-            facility_id: '',
-            weekday: 1,
-            start_time: '09:00',
-            end_time: '10:00',
-            capacity: 10,
-        });
+            setShowAddForm(false);
+            // Reset form
+            setFormData({
+                facility_id: '',
+                weekday: 1,
+                start_time: '09:00',
+                end_time: '10:00',
+                capacity: 10,
+            });
+        } catch (err: any) {
+            alert(err.response?.data?.message || 'Failed to create schedule');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    const handleRemoveSchedule = (id: string) => {
-        setSchedules(schedules.filter(s => s.id !== id));
+    const handleRemoveSchedule = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this schedule?')) return;
+
+        try {
+            await trainerApi.deleteSchedule(id);
+            setSchedules(schedules.filter(s => s.id !== id));
+        } catch (err) {
+            console.error('Failed to delete schedule:', err);
+            alert('Failed to delete schedule');
+        }
     };
 
     const getSchedulesForDay = (day: number) => {
@@ -109,13 +145,6 @@ const WeeklyScheduleBuilder: React.FC = () => {
                     <Plus className="w-4 h-4" />
                     Add Schedule
                 </button>
-            </div>
-
-            {/* Info Banner */}
-            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-600 px-4 py-3 rounded-lg">
-                <p className="text-sm">
-                    <strong>Note:</strong> Schedule creation is currently in preview mode. Backend integration coming soon!
-                </p>
             </div>
 
             {/* Add Schedule Form */}
@@ -200,8 +229,10 @@ const WeeklyScheduleBuilder: React.FC = () => {
                         <div className="flex gap-3 pt-2">
                             <button
                                 onClick={handleAddSchedule}
-                                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                                disabled={submitting}
+                                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
                             >
+                                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                                 Add to Schedule
                             </button>
                             <button

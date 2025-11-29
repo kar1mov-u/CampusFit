@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { facilityApi } from '../api/facility';
 import { bookingApi } from '../api/booking';
-import { Facility, Booking } from '../types';
+import { sessionApi } from '../api/session';
+import { Facility, Booking, Session } from '../types';
 import { format, addDays, isSameDay, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,6 +29,7 @@ const FacilitySchedule: React.FC = () => {
   const { user } = useAuth();
   const [facility, setFacility] = useState<Facility | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Monday
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
@@ -53,16 +55,28 @@ const FacilitySchedule: React.FC = () => {
       const weekDays = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
 
       try {
-        // Fetch bookings for each day of the week
+        // Fetch bookings and sessions for each day of the week
         const allBookingsPromises = weekDays.map(day =>
           bookingApi.getByFacility(id!, format(day, 'yyyy-MM-dd'))
         );
-        const allBookingsResults = await Promise.all(allBookingsPromises);
+        const allSessionsPromises = weekDays.map(day =>
+          sessionApi.listFacilitySessions(id!, format(day, 'yyyy-MM-dd'))
+        );
+
+        const [allBookingsResults, allSessionsResults] = await Promise.all([
+          Promise.all(allBookingsPromises),
+          Promise.all(allSessionsPromises)
+        ]);
+
         const allBookings = allBookingsResults.flatMap(result => result.data);
+        const allSessions = allSessionsResults.flatMap(result => result.data || []); // Handle potential null data
+
         setBookings(allBookings);
+        setSessions(allSessions);
       } catch (bookingErr) {
-        console.log('Bookings endpoint error', bookingErr);
+        console.log('Bookings/Sessions endpoint error', bookingErr);
         setBookings([]);
+        setSessions([]);
       }
     } catch (err) {
       console.error('Failed to load facility data', err);
@@ -87,7 +101,15 @@ const FacilitySchedule: React.FC = () => {
     return slots;
   };
 
-  const getSlotStatus = (hour: number, date: Date): 'available' | 'booked' | 'my-booking' => {
+  const getSlotStatus = (hour: number, date: Date): 'available' | 'booked' | 'my-booking' | 'session' => {
+    // Check for sessions first
+    const session = sessions.find((s) => {
+      const startHour = parseInt(s.start_time.split(':')[0]);
+      const endHour = parseInt(s.end_time.split(':')[0]);
+      return hour >= startHour && hour < endHour && !s.is_canceled && isSameDay(new Date(s.date), date);
+    });
+    if (session) return 'session';
+
     const booking = bookings.find((b) => {
       const startHour = parseInt(b.start_time.split(':')[0]);
       const endHour = parseInt(b.end_time.split(':')[0]);
@@ -330,6 +352,10 @@ const FacilitySchedule: React.FC = () => {
               <div className="w-3 h-3 rounded-full bg-blue-500/20 border border-blue-500/50"></div>
               <span>Your Booking</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500/20 border border-purple-500/50"></div>
+              <span>Training Session</span>
+            </div>
           </div>
         </div>
 
@@ -342,7 +368,7 @@ const FacilitySchedule: React.FC = () => {
             slotTime.setHours(slot.hour, 0, 0, 0);
             const isPastSlot = slotTime < now;
 
-            // Only show available slots and user's own bookings
+            // Only show available slots, user's own bookings, and sessions
             if (status === 'booked') {
               return null;
             }
@@ -352,23 +378,32 @@ const FacilitySchedule: React.FC = () => {
                 key={slot.time}
                 whileHover={status === 'available' && !isPastSlot ? { scale: 1.02 } : {}}
                 whileTap={status === 'available' && !isPastSlot ? { scale: 0.98 } : {}}
-                onClick={() => handleSlotClick(slot.hour, selectedDate)}
-                disabled={status !== 'available' || isPastSlot}
+                onClick={() => {
+                  if (status === 'session') {
+                    alert('Registration for sessions coming soon!');
+                    return;
+                  }
+                  handleSlotClick(slot.hour, selectedDate);
+                }}
+                disabled={(status !== 'available' && status !== 'session') || isPastSlot}
                 className={cn(
                   "p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
                   status === 'available' && !selected && !isPastSlot && "bg-card hover:border-primary/50 cursor-pointer",
                   status === 'available' && !selected && isPastSlot && "bg-card opacity-50 cursor-not-allowed",
                   selected && "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20",
-                  status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default"
+                  status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default",
+                  status === 'session' && "bg-purple-500/10 text-purple-600 border-purple-500/20 cursor-pointer hover:bg-purple-500/20"
                 )}
               >
                 <div className="text-lg font-bold">{slot.time}</div>
                 <div className="text-xs mt-1 font-medium flex items-center justify-center gap-1">
                   {selected && <Check className="w-3 h-3" />}
                   {status === 'my-booking' && <Users className="w-3 h-3" />}
+                  {status === 'session' && <Users className="w-3 h-3" />}
                   {status === 'available' && !selected && 'Available'}
                   {selected && 'Selected'}
                   {status === 'my-booking' && 'Your Booking'}
+                  {status === 'session' && 'Training Session'}
                 </div>
               </motion.button>
             );

@@ -139,3 +139,16 @@ export interface FacilityRating {
   average_rating: number;
 }
 
+export interface Session {
+  id: string;
+  schedule_id: string;
+  trainer_id: string;
+  facility_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  is_canceled: boolean;
+  created_at: string;
+  updated_at: string;
+}

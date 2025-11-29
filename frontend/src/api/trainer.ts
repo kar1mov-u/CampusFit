@@ -20,17 +20,21 @@ export const trainerApi = {
         return response.data;
     },
 
-    // Create weekly schedule (placeholder for future backend)
+    // Create weekly schedule
     createWeeklySchedule: async (data: any) => {
-        // TODO: Implement when backend endpoint is ready
-        console.log('Creating schedule:', data);
-        return Promise.resolve({ success: true, message: 'Schedule created', data: null });
+        const response = await api.post<ApiResponse<any>>('/schedules', data);
+        return response.data;
     },
 
-    // Get weekly schedules (placeholder for future backend)
+    // Get weekly schedules
     getWeeklySchedules: async (trainerId: string) => {
-        // TODO: Implement when backend endpoint is ready
-        console.log('Getting schedules for trainer:', trainerId);
-        return Promise.resolve({ success: true, message: 'Schedules retrieved', data: [] });
+        const response = await api.get<ApiResponse<any[]>>(`/schedules/trainer/${trainerId}`);
+        return response.data;
+    },
+
+    // Delete schedule
+    deleteSchedule: async (scheduleId: string) => {
+        const response = await api.delete<ApiResponse<null>>(`/schedules/${scheduleId}`);
+        return response.data;
     },
 };
