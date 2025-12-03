@@ -24,11 +24,21 @@ RUN go build -o /app cmd/main.go
 # Final lightweight stage
 FROM alpine:3.21 AS final
 
+# Install netcat for database health check and ca-certificates for HTTPS
+RUN apk add --no-cache netcat-openbsd ca-certificates
+
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app /bin/app
+
+# Copy migration files
+COPY --from=builder /build/db/migrations /app/db/migrations
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose the application's port
 EXPOSE 8080
 
-# Run the application
-CMD ["bin/app"]
+# Use entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
