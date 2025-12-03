@@ -26,6 +26,14 @@ func (s *BookingService) CreateNewBooking(ctx context.Context, data Booking) err
 	}
 	defer tx.Rollback(ctx)
 
+	hasEnoughPoints, err := s.bookingRepo.UserHasEnoughPoints(ctx, tx, data.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to check user points: %w", err)
+	}
+	if !hasEnoughPoints {
+		return fmt.Errorf("user does not have enough points")
+	}
+
 	hasBooking, err := s.bookingRepo.UserHasBooking(ctx, tx, data.UserID, data.FacilityID, data.Date)
 	if err != nil {
 		return fmt.Errorf("failed to check user daily booking: %w", err)

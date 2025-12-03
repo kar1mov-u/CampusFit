@@ -7,14 +7,19 @@ import (
 )
 
 type Penalty struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	GivenByID   uuid.UUID
-	SessionID   uuid.UUID
-	BookingID   uuid.UUID
-	Reason      string
-	Points      int
-	PenaltyType string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	GivenByID    uuid.UUID
+	SessionID    uuid.UUID
+	BookingID    uuid.UUID
+	Reason       string
+	Points       int
+	PenaltyType  string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	FacilityName string
+	SessionDate  *time.Time
+	BookingDate  *time.Time
+	ContextInfo  string
+	UserName     string
 }

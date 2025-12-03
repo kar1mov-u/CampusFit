@@ -38,6 +38,10 @@ func (s *SessionService) ListTrainerSessions(ctx context.Context, trainerID uuid
 	return s.sessionRepo.ListTrainerSessions(ctx, trainerID, date)
 }
 
+func (s *SessionService) GetSession(ctx context.Context, id uuid.UUID) (*Session, error) {
+	return s.sessionRepo.GetSession(ctx, id)
+}
+
 // for the next n weeks we it will create sessions
 func (s *SessionService) CreateSessionsForNextWeeks(schedule schedule.Schedule, weeks int) error {
 	days := NextWeekdays(schedule.WeekDay, 2)

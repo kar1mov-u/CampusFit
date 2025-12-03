@@ -22,6 +22,10 @@ type PenaltyRepositoryPostgres struct {
 	pool *pgxpool.Pool
 }
 
+func NewPenaltyRepositoryPostgres(pool *pgxpool.Pool) PenaltyRepository {
+	return &PenaltyRepositoryPostgres{pool: pool}
+}
+
 func (r *PenaltyRepositoryPostgres) CreatePenalty(ctx context.Context, data Penalty) error {
 
 	//should deduct points by the user
@@ -39,7 +43,17 @@ func (r *PenaltyRepositoryPostgres) CreatePenalty(ctx context.Context, data Pena
 	//next, create row in the penalties table
 	query = `INSERT INTO user_penalties (penalty_id, user_id, given_by_id, session_id, booking_id, reason, points, penalty_type) VALUES( $1, $2, $3, $4, $5, $6, $7, $8)`
 
-	_, err = tx.Exec(ctx, query, data.ID, data.UserID, data.GivenByID, data.SessionID, data.BookingID, data.Reason, data.Points, data.PenaltyType)
+	// Handle nullable UUIDs - convert zero UUID to nil
+	var sessionID interface{} = data.SessionID
+	if data.SessionID == uuid.Nil {
+		sessionID = nil
+	}
+	var bookingID interface{} = data.BookingID
+	if data.BookingID == uuid.Nil {
+		bookingID = nil
+	}
+
+	_, err = tx.Exec(ctx, query, data.ID, data.UserID, data.GivenByID, sessionID, bookingID, data.Reason, data.Points, data.PenaltyType)
 
 	if err != nil {
 		return fmt.Errorf("CreatePenalty: Failed to INSERT: %w", err)
@@ -71,10 +85,27 @@ func (r *PenaltyRepositoryPostgres) DeletePenalty(ctx context.Context, id uuid.U
 }
 
 func (r *PenaltyRepositoryPostgres) ListPenaltyForUser(ctx context.Context, userID uuid.UUID) ([]Penalty, error) {
-	query := `SELECT penalty_id, user_id, given_by_id,
-	 COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
-	 COALESCE(booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
-	reason, points, penalty_type, created_at, updated_at FROM user_penalties WHERE user_id=$1`
+	query := `
+		SELECT 
+			p.penalty_id, p.user_id, p.given_by_id,
+			COALESCE(p.session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
+			COALESCE(p.booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
+			p.reason, p.points, p.penalty_type, p.created_at, p.updated_at,
+			COALESCE(f_session.name, f_booking.name, '') as facility_name,
+			ts.date as session_date,
+			b.date as booking_date,
+			COALESCE(
+				CASE WHEN p.session_id IS NOT NULL THEN 'Training Session' ELSE NULL END,
+				CASE WHEN p.booking_id IS NOT NULL THEN 'Facility Booking' ELSE NULL END,
+				'General'
+			) as context_info
+		FROM user_penalties p
+		LEFT JOIN trainer_sessions ts ON p.session_id = ts.session_id
+		LEFT JOIN facilities f_session ON ts.facility_id = f_session.facility_id
+		LEFT JOIN bookings b ON p.booking_id = b.booking_id
+		LEFT JOIN facilities f_booking ON b.facility_id = f_booking.facility_id
+		WHERE p.user_id=$1
+		ORDER BY p.created_at DESC`
 
 	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
@@ -86,7 +117,11 @@ func (r *PenaltyRepositoryPostgres) ListPenaltyForUser(ctx context.Context, user
 	resp := make([]Penalty, 0)
 	for rows.Next() {
 		var p Penalty
-		err := rows.Scan(&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID, &p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt)
+		err := rows.Scan(
+			&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID,
+			&p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt,
+			&p.FacilityName, &p.SessionDate, &p.BookingDate, &p.ContextInfo,
+		)
 		if err != nil {
 			return []Penalty{}, fmt.Errorf("ListPenaltyForUser: Failed to SCAN :%w", err)
 		}
@@ -96,10 +131,29 @@ func (r *PenaltyRepositoryPostgres) ListPenaltyForUser(ctx context.Context, user
 }
 
 func (r *PenaltyRepositoryPostgres) ListGivenPenaltyByUser(ctx context.Context, userID uuid.UUID) ([]Penalty, error) {
-	query := `SELECT penalty_id, user_id, given_by_id,
-	 COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
-	 COALESCE(booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
-	reason, points, penalty_type, created_at, updated_at FROM user_penalties WHERE given_by_id=$1`
+	query := `
+		SELECT 
+			p.penalty_id, p.user_id, p.given_by_id,
+			COALESCE(p.session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
+			COALESCE(p.booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
+			p.reason, p.points, p.penalty_type, p.created_at, p.updated_at,
+			COALESCE(f_session.name, f_booking.name, '') as facility_name,
+			ts.date as session_date,
+			b.date as booking_date,
+			COALESCE(
+				CASE WHEN p.session_id IS NOT NULL THEN 'Training Session' ELSE NULL END,
+				CASE WHEN p.booking_id IS NOT NULL THEN 'Facility Booking' ELSE NULL END,
+				'General'
+			) as context_info,
+			u.first_name || ' ' || u.last_name as user_name
+		FROM user_penalties p
+		JOIN users u ON p.user_id = u.user_id
+		LEFT JOIN trainer_sessions ts ON p.session_id = ts.session_id
+		LEFT JOIN facilities f_session ON ts.facility_id = f_session.facility_id
+		LEFT JOIN bookings b ON p.booking_id = b.booking_id
+		LEFT JOIN facilities f_booking ON b.facility_id = f_booking.facility_id
+		WHERE p.given_by_id=$1
+		ORDER BY p.created_at DESC`
 
 	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
@@ -111,7 +165,12 @@ func (r *PenaltyRepositoryPostgres) ListGivenPenaltyByUser(ctx context.Context, 
 	resp := make([]Penalty, 0)
 	for rows.Next() {
 		var p Penalty
-		err := rows.Scan(&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID, &p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt)
+		err := rows.Scan(
+			&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID,
+			&p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt,
+			&p.FacilityName, &p.SessionDate, &p.BookingDate, &p.ContextInfo,
+			&p.UserName,
+		)
 		if err != nil {
 			return []Penalty{}, fmt.Errorf("ListGivenPenaltyByUser: Failed to SCAN :%w", err)
 		}
@@ -121,10 +180,28 @@ func (r *PenaltyRepositoryPostgres) ListGivenPenaltyByUser(ctx context.Context, 
 }
 
 func (r *PenaltyRepositoryPostgres) ListPenaltiesInterval(ctx context.Context, start_date time.Time, end_date time.Time) ([]Penalty, error) {
-	query := `SELECT penalty_id, user_id, given_by_id,
-	 COALESCE(session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
-	 COALESCE(booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
-	reason, points, penalty_type, created_at, updated_at FROM user_penalties WHERE created_at BETWEEN $1 AND $2`
+	query := `
+		SELECT 
+			p.penalty_id, p.user_id, p.given_by_id,
+			COALESCE(p.session_id, '00000000-0000-0000-0000-000000000000'::uuid) AS session_id,
+			COALESCE(p.booking_id, '00000000-0000-0000-0000-000000000000'::uuid) AS booking_id,
+			p.reason, p.points, p.penalty_type, p.created_at, p.updated_at,
+			COALESCE(f_session.name, f_booking.name, '') as facility_name,
+			ts.date as session_date,
+			b.date as booking_date,
+			COALESCE(
+				CASE WHEN p.session_id IS NOT NULL THEN 'Training Session' ELSE NULL END,
+				CASE WHEN p.booking_id IS NOT NULL THEN 'Facility Booking' ELSE NULL END,
+				'General'
+			) as context_info
+		FROM user_penalties p
+		LEFT JOIN trainer_sessions ts ON p.session_id = ts.session_id
+		LEFT JOIN facilities f_session ON ts.facility_id = f_session.facility_id
+		LEFT JOIN bookings b ON p.booking_id = b.booking_id
+		LEFT JOIN facilities f_booking ON b.facility_id = f_booking.facility_id
+		WHERE p.created_at BETWEEN $1 AND $2
+		ORDER BY p.created_at DESC`
+
 	rows, err := r.pool.Query(ctx, query, start_date, end_date)
 	if err != nil {
 		return []Penalty{}, fmt.Errorf("ListPenaltiesInterval: Failed to SELECT :%w", err)
@@ -135,7 +212,11 @@ func (r *PenaltyRepositoryPostgres) ListPenaltiesInterval(ctx context.Context, s
 	resp := make([]Penalty, 0)
 	for rows.Next() {
 		var p Penalty
-		err := rows.Scan(&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID, &p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt)
+		err := rows.Scan(
+			&p.ID, &p.UserID, &p.GivenByID, &p.SessionID, &p.BookingID,
+			&p.Reason, &p.Points, &p.PenaltyType, &p.CreatedAt, &p.UpdatedAt,
+			&p.FacilityName, &p.SessionDate, &p.BookingDate, &p.ContextInfo,
+		)
 		if err != nil {
 			return []Penalty{}, fmt.Errorf("ListPenaltiesInterval: Failed to SCAN :%w", err)
 		}

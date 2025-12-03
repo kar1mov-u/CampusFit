@@ -3,7 +3,6 @@ package booking
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +15,7 @@ type BookingRepository interface {
 	UserHasOverlap(ctx context.Context, tx pgx.Tx, userID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error)     //checks user has overalp of bookings with other facilities
 	BookingHasOverlap(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, start time.Time, end time.Time, date time.Time) (bool, error) //checks if the booking on that facility has not  overalp on that time interval
 	HasTooManyBookings(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (bool, error)
+	UserHasEnoughPoints(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (bool, error)
 	CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error
 	ListBookigsForFacility(ctx context.Context, tx pgx.Tx, facilID uuid.UUID, date time.Time) ([]Booking, error)
 	ListBookingsForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID, offset int) ([]Booking, error)
@@ -137,8 +137,18 @@ func (r *BookingRepositoryPostgres) HasTooManyBookings(ctx context.Context, tx p
 	if err != nil {
 		return false, fmt.Errorf("HasTooManyBookings query error: %w", err)
 	}
-	log.Println(count)
 	return count >= 3, nil
+}
+
+func (r *BookingRepositoryPostgres) UserHasEnoughPoints(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (bool, error) {
+	query := `SELECT credit_score FROM users WHERE user_id = $1`
+
+	var count int
+	err := r.execRow(ctx, tx, query, userID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("UserHasEnoughPoints query error: %w", err)
+	}
+	return count >= 50, nil
 }
 
 func (r *BookingRepositoryPostgres) CreateBooking(ctx context.Context, tx pgx.Tx, data Booking) error {

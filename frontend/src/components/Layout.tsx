@@ -11,9 +11,11 @@ import {
   Menu,
   X,
   Dumbbell,
-  Users
+  Users,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import CreditScoreBadge from './common/CreditScoreBadge';
 
 const Layout: React.FC = () => {
   const { user, logout, isAdmin, isTrainer } = useAuth();
@@ -31,9 +33,16 @@ const Layout: React.FC = () => {
       { name: 'Facilities', href: '/facilities', icon: LayoutGrid },
       { name: 'Trainers', href: '/trainers', icon: Users },
       { name: 'My Bookings', href: '/bookings', icon: Calendar },
+      { name: 'My Penalties', href: '/penalties', icon: AlertTriangle },
     ] : []),
-    ...(isTrainer ? [{ name: 'Trainer Dashboard', href: '/trainer/dashboard', icon: User }] : []),
-    ...(isAdmin ? [{ name: 'Admin Panel', href: '/admin', icon: LayoutDashboard }] : []),
+    ...(isTrainer ? [
+      { name: 'Trainer Dashboard', href: '/trainer/dashboard', icon: User },
+      { name: 'Given Penalties', href: '/penalties/given', icon: AlertTriangle }
+    ] : []),
+    ...(isAdmin ? [
+      { name: 'Admin Panel', href: '/admin', icon: LayoutDashboard },
+      { name: 'Given Penalties', href: '/penalties/given', icon: AlertTriangle }
+    ] : []),
   ];
 
   return (
@@ -81,6 +90,11 @@ const Layout: React.FC = () => {
               <div className="overflow-hidden">
                 <p className="text-sm font-medium truncate">{user?.first_name} {user?.last_name}</p>
                 <p className="text-xs text-muted-foreground truncate capitalize">{user?.role}</p>
+                {user?.credit_score !== undefined && (
+                  <div className="mt-1">
+                    <CreditScoreBadge score={user.credit_score} />
+                  </div>
+                )}
               </div>
             </div>
           </div>

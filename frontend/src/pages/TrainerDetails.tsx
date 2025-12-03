@@ -142,15 +142,7 @@ const TrainerDetails: React.FC = () => {
                         <div className="flex-1 space-y-2">
                             <h1 className="text-4xl font-bold">{trainer.user.first_name} {trainer.user.last_name}</h1>
                             <p className="text-xl text-primary font-medium">{trainer.specialization}</p>
-                            <div className="flex items-center gap-4 text-muted-foreground">
-                                <div className="flex items-center">
-                                    <Star className="w-4 h-4 text-yellow-500 mr-1 fill-yellow-500" />
-                                    <span className="font-medium text-foreground">4.9</span>
-                                    <span className="ml-1">(120+ reviews)</span>
-                                </div>
-                                <span>•</span>
-                                <span>5 Years Experience</span>
-                            </div>
+
                         </div>
                         <button
                             onClick={() => navigate('/trainers')}

@@ -15,6 +15,7 @@ type SessionRepository interface {
 	CancelSession(ctx context.Context, id uuid.UUID) error
 	ListFacilitySessions(ctx context.Context, facilityID uuid.UUID, date time.Time) ([]Session, error)
 	ListTrainerSessions(ctx context.Context, trainerID uuid.UUID, date time.Time) ([]Session, error)
+	GetSession(ctx context.Context, id uuid.UUID) (*Session, error)
 }
 
 type SessionRepositoryPostgres struct {
@@ -101,4 +102,17 @@ func (r *SessionRepositoryPostgres) ListTrainerSessions(ctx context.Context, tra
 		sessions = append(sessions, s)
 	}
 	return sessions, nil
+}
+
+func (r *SessionRepositoryPostgres) GetSession(ctx context.Context, id uuid.UUID) (*Session, error) {
+	query := `SELECT ts.session_id, ts.schedule_id, ts.trainer_id, ts.facility_id, ts.date, ts.start_time, ts.end_time, ts.capacity, ts.is_canceled,
+			  (SELECT COUNT(*) FROM training_session_register r WHERE r.session_id = ts.session_id AND r.is_canceled = FALSE) as registered_count
+			  FROM trainer_sessions ts WHERE ts.session_id=$1`
+
+	var s Session
+	err := r.pool.QueryRow(ctx, query, id).Scan(&s.ID, &s.ScheduleID, &s.TrainerID, &s.FacilityID, &s.Date, &s.StartTime, &s.EndTime, &s.Capacity, &s.IsCanceled, &s.RegisteredCount)
+	if err != nil {
+		return nil, fmt.Errorf("GetSession: Failed to scan: %w", err)
+	}
+	return &s, nil
 }

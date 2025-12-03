@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
-
+import { userService } from '../api/user';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAdmin: boolean;
   isTrainer: boolean;
   loading: boolean;
@@ -53,6 +54,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    if (!user?.id) return;
+    try {
+      const updatedUser = await userService.getById(user.id);
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
   const isTrainer = user?.role === 'trainer' || user?.is_trainer === true;
 
@@ -65,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isTrainer, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, refreshUser, isAdmin, isTrainer, loading }}>
       {children}
     </AuthContext.Provider>
   );

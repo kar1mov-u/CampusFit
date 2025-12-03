@@ -18,13 +18,12 @@ type Config struct {
 
 func Load() Config {
 	var cnf Config
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Fatal("cannot parse .env", err)
+	// Load .env file if it exists (for local dev), but don't fail if it doesn't (for Docker)
+	_ = godotenv.Load(".env")
 
-	}
 	err := env.Parse(&cnf)
 	if err != nil {
-		log.Fatal("cannot parse .env", err)
+		log.Fatal("cannot parse environment variables", err)
 	}
 	return cnf
 }

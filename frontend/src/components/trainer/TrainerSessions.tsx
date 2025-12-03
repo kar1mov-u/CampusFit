@@ -4,9 +4,10 @@ import { sessionApi } from '../../api/session';
 import { registrationApi } from '../../api/registration';
 import { Session, Registration } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, ChevronLeft, ChevronRight, Users, Clock, Loader2, MapPin } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Users, Clock, Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import PenalizeUserModal from './PenalizeUserModal';
 
 const TrainerSessions: React.FC = () => {
     const { user } = useAuth();
@@ -16,6 +17,8 @@ const TrainerSessions: React.FC = () => {
     const [selectedSession, setSelectedSession] = useState<string | null>(null);
     const [sessionRegistrations, setSessionRegistrations] = useState<Record<string, Registration[]>>({});
     const [loadingRegistrations, setLoadingRegistrations] = useState<Record<string, boolean>>({});
+    const [isPenalizeModalOpen, setIsPenalizeModalOpen] = useState(false);
+    const [penaltyUser, setPenaltyUser] = useState<{ id: string; name: string; sessionId?: string } | null>(null);
 
     useEffect(() => {
         if (user?.id) {
@@ -52,7 +55,7 @@ const TrainerSessions: React.FC = () => {
         try {
             setLoadingRegistrations(prev => ({ ...prev, [sessionId]: true }));
             const response = await registrationApi.listSessionRegistrations(sessionId);
-            setSessionRegistrations(prev => ({ ...prev, [sessionId]: response.data }));
+            setSessionRegistrations(prev => ({ ...prev, [sessionId]: response.data || [] }));
         } catch (err) {
             console.error('Failed to load registrations', err);
         } finally {
@@ -193,8 +196,25 @@ const TrainerSessions: React.FC = () => {
                                                                                 </p>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="text-xs text-muted-foreground">
-                                                                            Registered {format(new Date(reg.created_at), 'MMM d, HH:mm')}
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="text-xs text-muted-foreground">
+                                                                                Registered {format(new Date(reg.created_at), 'MMM d, HH:mm')}
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setPenaltyUser({
+                                                                                        id: reg.user?.id || '',
+                                                                                        name: `${reg.user?.first_name} ${reg.user?.last_name}`,
+                                                                                        sessionId: session.id
+                                                                                    });
+                                                                                    setIsPenalizeModalOpen(true);
+                                                                                }}
+                                                                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                                                                title="Penalize User"
+                                                                            >
+                                                                                <AlertTriangle className="w-4 h-4" />
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -225,6 +245,18 @@ const TrainerSessions: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <PenalizeUserModal
+                isOpen={isPenalizeModalOpen}
+                onClose={() => setIsPenalizeModalOpen(false)}
+                userId={penaltyUser?.id || ''}
+                userName={penaltyUser?.name || ''}
+                sessionId={penaltyUser?.sessionId}
+                onSuccess={() => {
+                    // Optionally reload registrations or show toast
+                    setIsPenalizeModalOpen(false);
+                }}
+            />
         </div>
     );
 };

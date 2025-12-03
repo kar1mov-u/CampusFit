@@ -11,9 +11,11 @@ import Facilities from './pages/Facilities';
 import FacilitySchedule from './pages/FacilitySchedule';
 import Admin from './pages/Admin';
 import BookingsManagement from './pages/BookingsManagement';
+import MyPenalties from './pages/MyPenalties';
 import TrainerDashboard from './pages/TrainerDashboard';
 import Trainers from './pages/Trainers';
 import TrainerDetails from './pages/TrainerDetails';
+import GivenPenalties from './pages/GivenPenalties';
 
 function App() {
   return (
@@ -30,17 +32,20 @@ function App() {
               <Route path="/facilities" element={<Facilities />} />
               <Route path="/facilities/:id" element={<FacilitySchedule />} />
               <Route path="/bookings" element={<BookingsManagement />} />
+              <Route path="/penalties" element={<MyPenalties />} />
               <Route path="/trainers" element={<Trainers />} />
               <Route path="/trainers/:id" element={<TrainerDetails />} />
 
               {/* Trainer Routes */}
               <Route element={<TrainerRoute />}>
                 <Route path="/trainer/dashboard" element={<TrainerDashboard />} />
+                <Route path="/penalties/given" element={<GivenPenalties />} />
               </Route>
 
               {/* Admin Routes */}
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/penalties/given" element={<GivenPenalties />} />
               </Route>
             </Route>
           </Route>

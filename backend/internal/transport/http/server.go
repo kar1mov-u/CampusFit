@@ -6,6 +6,7 @@ import (
 	"t/internal/auth"
 	"t/internal/booking"
 	"t/internal/facility"
+	"t/internal/penalty"
 	"t/internal/registration"
 	"t/internal/review"
 	"t/internal/schedule"
@@ -32,11 +33,12 @@ type Server struct {
 	sessionService      *session.SessionService
 	scheduleService     *schedule.ScheduleService
 	registrationService *registration.RegistrationService
+	penaltyService      *penalty.PenaltyService
 	validator           *validator.Validate
 	logger              *zap.Logger
 }
 
-func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService, sessionSrv *session.SessionService, scheduleSrv *schedule.ScheduleService, registrationSrv *registration.RegistrationService) *Server {
+func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService, facilSrv *facility.FacilityService, bookSrv *booking.BookingService, reviewSrv *review.ReviewService, trainerSrv *trainer.TrainerService, sessionSrv *session.SessionService, scheduleSrv *schedule.ScheduleService, registrationSrv *registration.RegistrationService, penaltySrv *penalty.PenaltyService) *Server {
 	router := chi.NewMux()
 
 	validator := validator.New(validator.WithRequiredStructEnabled())
@@ -59,6 +61,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 		sessionService:      sessionSrv,
 		scheduleService:     scheduleSrv,
 		registrationService: registrationSrv,
+		penaltyService:      penaltySrv,
 		authService:         authSrv,
 		router:              router, // our application also needs this router to set up routes/middlewares so they will be reflected in the httpServer
 	}
@@ -71,7 +74,7 @@ func NewServer(addr string, userSrv *user.UserService, authSrv *auth.AuthService
 
 func (s *Server) registerHandlers() {
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://200.60.0.245:3000"},
+		AllowedOrigins:   []string{"http://localhost:80", "http://0.0.0.0:80"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -144,6 +147,13 @@ func (s *Server) registerHandlers() {
 			pro.Post("/registrations/cancel/{id}", s.CancelRegistrationHandler)
 			pro.Get("/registrations/session/{session_id}", s.ListSessionRegistrationsHandler)
 			pro.Get("/registrations/user/{user_id}", s.ListUserRegistrationsHandler)
+
+			// Penalty endpoints
+			pro.Post("/penalties", s.CreatePenaltyHandler)
+			pro.Delete("/penalties/{id}", s.DeletePenaltyHandler)
+			pro.Get("/penalties/user/{id}", s.ListPenaltyForUserHandler)
+			pro.Get("/penalties/given/{id}", s.ListGivenPenaltyByUserHandler)
+			pro.Get("/penalties/interval", s.ListPenaltiesIntervalHandler)
 		})
 
 	})

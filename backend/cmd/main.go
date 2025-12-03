@@ -8,6 +8,7 @@ import (
 	"t/internal/booking"
 	"t/internal/config"
 	"t/internal/facility"
+	"t/internal/penalty"
 	"t/internal/registration"
 	"t/internal/review"
 	"t/internal/schedule"
@@ -65,7 +66,11 @@ func main() {
 	registrationRep := registration.NewRegistrationRepositoryPostgres(pGpool)
 	registrationSrv := registration.NewRegistrationService(registrationRep)
 
-	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv, trainerSrv, sessionSrv, scheduleSrv, registrationSrv)
+	//create penalty
+	penaltyRep := penalty.NewPenaltyRepositoryPostgres(pGpool)
+	penaltySrv := penalty.NewPenaltyService(penaltyRep)
+
+	srv := http.NewServer(":8080", userSrvs, authSrv, facilSrv, bookingSrv, reviewSrv, trainerSrv, sessionSrv, scheduleSrv, registrationSrv, penaltySrv)
 
 	srv.Start()
 

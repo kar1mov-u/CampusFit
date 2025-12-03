@@ -92,12 +92,7 @@ const Trainers: React.FC = () => {
                                 </p>
 
                                 <div className="pt-4 flex items-center justify-between border-t border-border">
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <Star className="w-4 h-4 text-yellow-500 mr-1 fill-yellow-500" />
-                                        <span className="font-medium text-foreground">4.9</span>
-                                        <span className="mx-1">•</span>
-                                        <span>120+ Sessions</span>
-                                    </div>
+
 
                                     <button
                                         onClick={() => navigate(`/trainers/${trainer.id}`)}

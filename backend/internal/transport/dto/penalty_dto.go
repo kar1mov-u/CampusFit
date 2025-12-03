@@ -13,7 +13,7 @@ type CreatePenaltyRequest struct {
 	BookingID   uuid.UUID `json:"booking_id"`
 	SessionID   uuid.UUID `json:"session_id"`
 	Reason      string    `json:"reason" validate:"required"`
-	Points      int       `json:"points" validate:"required, min=5, max=30"`
+	Points      int       `json:"points" validate:"required"`
 	PenaltyType string    `json:"penalty_type" validate:"required"`
 }
 
@@ -30,16 +30,21 @@ func (p *CreatePenaltyRequest) ToModel() penalty.Penalty {
 }
 
 type PenaltyResponse struct {
-	ID          uuid.UUID `json:"penalty_id"`
-	UserID      uuid.UUID `json:"user_id"`
-	GivenByID   uuid.UUID `json:"given_by_id"`
-	SessionID   uuid.UUID `json:"session_id"`
-	BookingID   uuid.UUID `json:"booking_id"`
-	Reason      string    `json:"reason"`
-	Points      int       `json:"points"`
-	PenaltyType string    `json:"penalty_type"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           uuid.UUID  `json:"id"`
+	UserID       uuid.UUID  `json:"user_id"`
+	GivenByID    uuid.UUID  `json:"given_by_id"`
+	SessionID    uuid.UUID  `json:"session_id"`
+	BookingID    uuid.UUID  `json:"booking_id"`
+	Reason       string     `json:"reason"`
+	Points       int        `json:"points"`
+	PenaltyType  string     `json:"penalty_type"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	FacilityName string     `json:"facility_name,omitempty"`
+	SessionDate  *time.Time `json:"session_date,omitempty"`
+	BookingDate  *time.Time `json:"booking_date,omitempty"`
+	ContextInfo  string     `json:"context_info,omitempty"`
+	UserName     string     `json:"user_name,omitempty"`
 }
 
 func (p *PenaltyResponse) FromModel(m penalty.Penalty) {
@@ -53,4 +58,9 @@ func (p *PenaltyResponse) FromModel(m penalty.Penalty) {
 	p.PenaltyType = m.PenaltyType
 	p.CreatedAt = m.CreatedAt
 	p.UpdatedAt = m.UpdatedAt
+	p.FacilityName = m.FacilityName
+	p.SessionDate = m.SessionDate
+	p.BookingDate = m.BookingDate
+	p.ContextInfo = m.ContextInfo
+	p.UserName = m.UserName
 }

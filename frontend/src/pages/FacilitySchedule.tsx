@@ -4,7 +4,9 @@ import { facilityApi } from '../api/facility';
 import { bookingApi } from '../api/booking';
 import { sessionApi } from '../api/session';
 import { registrationApi } from '../api/registration';
-import { Facility, Booking, Session, Registration } from '../types';
+import { userService } from '../api/user';
+import { Facility, Booking, Session, Registration, User } from '../types';
+import PenalizeUserModal from '../components/trainer/PenalizeUserModal';
 import { format, addDays, isSameDay, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +21,8 @@ import {
   Info,
   Loader2,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReviewSection from '../components/ReviewSection';
@@ -27,7 +30,7 @@ import ReviewSection from '../components/ReviewSection';
 const FacilitySchedule: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [facility, setFacility] = useState<Facility | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -41,6 +44,12 @@ const FacilitySchedule: React.FC = () => {
   const [selectedSlots, setSelectedSlots] = useState<number[]>([]);
   const [bookingNote, setBookingNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Admin Booking Management State
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bookingUser, setBookingUser] = useState<User | null>(null);
+  const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
+  const [showPenalizeModal, setShowPenalizeModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -138,17 +147,7 @@ const FacilitySchedule: React.FC = () => {
     return selectedSlots.some(slot => slot === hour) && isSameDay(date, selectedDate);
   };
 
-  const handleSlotClick = (hour: number, date: Date) => {
-    // Prevent booking on past dates and times
-    const now = new Date();
-    const slotTime = new Date(date);
-    slotTime.setHours(hour, 0, 0, 0);
-
-    if (slotTime < now) return;
-
-    // Set the selected date when clicking a slot
-    setSelectedDate(date);
-
+  const handleSlotClick = async (hour: number, date: Date) => {
     // Check if it's a session
     const session = sessions.find((s) => {
       const startHour = parseInt(s.start_time.split(':')[0]);
@@ -163,6 +162,50 @@ const FacilitySchedule: React.FC = () => {
     }
 
     const status = getSlotStatus(hour, date);
+
+    // Admin handling for booked slots
+    if (isAdmin && status === 'booked') {
+      const booking = bookings.find((b) => {
+        const startHour = parseInt(b.start_time.split(':')[0]);
+        const endHour = parseInt(b.end_time.split(':')[0]);
+        return hour >= startHour && hour < endHour && !b.is_canceled && isSameDay(new Date(b.date), date);
+      });
+
+      if (booking) {
+        setSelectedBooking(booking);
+        // Fetch user details
+        try {
+          const response = await userService.getById(booking.user_id);
+          if (response) {
+            setBookingUser(response);
+            setShowBookingDetailsModal(true);
+          } else {
+            alert('Failed to fetch user details');
+          }
+        } catch (err) {
+          console.error('Error fetching user details:', err);
+          alert('Failed to fetch user details');
+        }
+      }
+      return;
+    }
+
+    // Prevent booking on past dates and times for normal booking flow
+    const now = new Date();
+    const slotTime = new Date(date);
+    slotTime.setHours(hour, 0, 0, 0);
+
+    if (slotTime < now) return;
+
+    // Check credit score
+    if (user?.credit_score !== undefined && user.credit_score < 50) {
+      alert("Your credit score is too low to make bookings. Please contact support.");
+      return;
+    }
+
+    // Set the selected date when clicking a slot
+    setSelectedDate(date);
+
     if (status !== 'available') return;
 
     if (isSlotSelected(hour, date)) {
@@ -201,6 +244,11 @@ const FacilitySchedule: React.FC = () => {
   const handleBooking = async () => {
     if (selectedSlots.length === 0 || !id) return;
 
+    if (user?.credit_score !== undefined && user.credit_score < 50) {
+      alert("Your credit score is too low to make bookings.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       const sortedSlots = [...selectedSlots].sort((a, b) => a - b);
@@ -238,6 +286,11 @@ const FacilitySchedule: React.FC = () => {
 
   const handleSessionRegistration = async () => {
     if (!selectedSession || !user) return;
+
+    if (user.credit_score !== undefined && user.credit_score < 50) {
+      alert("Your credit score is too low to register for sessions.");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -415,7 +468,8 @@ const FacilitySchedule: React.FC = () => {
             const isPastSlot = slotTime < now;
 
             // Only show available slots, user's own bookings, and sessions
-            if (status === 'booked') {
+            // Admins can see booked slots too
+            if (status === 'booked' && !isAdmin) {
               return null;
             }
 
@@ -425,7 +479,7 @@ const FacilitySchedule: React.FC = () => {
                 whileHover={status === 'available' && !isPastSlot ? { scale: 1.02 } : {}}
                 whileTap={status === 'available' && !isPastSlot ? { scale: 0.98 } : {}}
                 onClick={() => handleSlotClick(slot.hour, selectedDate)}
-                disabled={(status !== 'available' && status !== 'session') || isPastSlot}
+                disabled={(!isAdmin && status !== 'available' && status !== 'session') || (!isAdmin && isPastSlot)}
                 className={cn(
                   "p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
                   status === 'available' && !selected && !isPastSlot && "bg-card hover:border-primary/50 cursor-pointer",
@@ -433,7 +487,8 @@ const FacilitySchedule: React.FC = () => {
                   selected && "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20",
                   status === 'my-booking' && "bg-blue-500/10 text-blue-600 border-blue-500/20 cursor-default",
                   status === 'session' && "bg-purple-500/10 text-purple-600 border-purple-500/20 cursor-pointer hover:bg-purple-500/20",
-                  status === 'my-session' && "bg-green-500/10 text-green-600 border-green-500/20 cursor-default"
+                  status === 'my-session' && "bg-green-500/10 text-green-600 border-green-500/20 cursor-default",
+                  isAdmin && status === 'booked' && "bg-orange-500/10 text-orange-600 border-orange-500/20 cursor-pointer hover:bg-orange-500/20"
                 )}
               >
                 <div className="text-lg font-bold">{slot.time}</div>
@@ -447,6 +502,7 @@ const FacilitySchedule: React.FC = () => {
                   {status === 'my-booking' && 'Your Booking'}
                   {status === 'session' && 'Training Session'}
                   {status === 'my-session' && 'Registered'}
+                  {isAdmin && status === 'booked' && 'Booked'}
                   {(status === 'session' || status === 'my-session') && (() => {
                     const session = sessions.find(s => {
                       const startHour = parseInt(s.start_time.split(':')[0]);
@@ -639,6 +695,90 @@ const FacilitySchedule: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Admin Booking Details Modal */}
+      <AnimatePresence>
+        {showBookingDetailsModal && selectedBooking && bookingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border overflow-hidden"
+            >
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-2xl font-bold">Booking Details</h3>
+                    <p className="text-muted-foreground mt-1">Managed by Admin</p>
+                  </div>
+                  <button
+                    onClick={() => setShowBookingDetailsModal(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">User</span>
+                    <span className="font-medium">{bookingUser.first_name} {bookingUser.last_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="font-medium text-sm">{bookingUser.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="font-medium">{format(new Date(selectedBooking.date), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Time</span>
+                    <span className="font-medium">
+                      {selectedBooking.start_time} - {selectedBooking.end_time}
+                    </span>
+                  </div>
+                  {selectedBooking.note && (
+                    <div className="pt-2 border-t border-border/50">
+                      <span className="text-muted-foreground text-sm block mb-1">Note</span>
+                      <p className="text-sm">{selectedBooking.note}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowBookingDetailsModal(false);
+                      setShowPenalizeModal(true);
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors font-semibold flex items-center justify-center gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Penalize User
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Penalize User Modal */}
+      {selectedBooking && bookingUser && (
+        <PenalizeUserModal
+          isOpen={showPenalizeModal}
+          onClose={() => setShowPenalizeModal(false)}
+          userId={bookingUser.id}
+          userName={`${bookingUser.first_name} ${bookingUser.last_name}`}
+          bookingId={selectedBooking.id}
+          onSuccess={() => {
+            setShowPenalizeModal(false);
+            alert('Penalty applied successfully');
+          }}
+        />
+      )}
 
       {/* Reviews Section */}
       <div className="border-t border-border pt-12 mt-12">
